@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAFEWARE — AI-Powered Responsive Road Safety System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            obsidian: '#05070C',
+                            slate: '#0B0F19',
+                            cyan: '#06b6d4',
+                            emerald: '#10b981',
+                            amber: '#f59e0b',
+                            red: '#ef4444',
+                            steel: '#1e293b',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        display: ['Syncopate', 'Space Grotesk', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'scanline-sweep': 'scanlineSweep 4s ease-in-out infinite',
+                        'vignette-red': 'vignetteRed 1s ease-in-out infinite alternate',
+                        'vignette-amber': 'vignetteAmber 1.5s ease-in-out infinite alternate',
+                    },
+                    keyframes: {
+                        scanlineSweep: {
+                            '0%': { top: '0%' },
+                            '50%': { top: '100%' },
+                            '100%': { top: '0%' },
+                        },
+                        vignetteRed: {
+                            '0%': { 'box-shadow': 'inset 0 0 35px rgba(239, 68, 68, 0.35)' },
+                            '100%': { 'box-shadow': 'inset 0 0 85px rgba(239, 68, 68, 0.85)' }
+                        },
+                        vignetteAmber: {
+                            '0%': { 'box-shadow': 'inset 0 0 25px rgba(245, 158, 11, 0.25)' },
+                            '100%': { 'box-shadow': 'inset 0 0 60px rgba(245, 158, 11, 0.65)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts (Preloaded Syncopate wide font) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syncopate:wght@700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- React & ReactDOM CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Babel standalone JSX compiler -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(ellipse at top, #0f172a, #080711, #020205);
+            color: #f3f4f6;
+            overflow-x: hidden;
+        }
+        .hud-grid {
+            background-image: linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        /* Custom Fluid Scrollbars */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(to bottom, #06b6d4, #6366f1);
+            border-radius: 9999px;
+        }
+        .data-flow-line {
+            stroke-dasharray: 8, 6;
+            animation: flow 1.2s linear infinite;
+        }
+        @keyframes flow {
+            to { stroke-dashoffset: -20; }
+        }
+        .laser-line {
+            background: linear-gradient(to right, transparent, rgba(6, 182, 212, 0.4), rgba(6, 182, 212, 0.7), rgba(6, 182, 212, 0.4), transparent);
+            height: 2px;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.8);
+        }
+        .spring-transition {
+            transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        /* Synchronized Heartbeat Keyframes */
+        @keyframes heart-flash {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px transparent); }
+            15% { transform: scale(1.25); filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.95)); }
+            30% { transform: scale(0.9); }
+            45% { transform: scale(1.1); }
+            60% { transform: scale(1); }
+        }
+        .heart-beat-active {
+            animation-name: heart-flash;
+            animation-timing-function: ease-in-out;
+            animation-iteration-count: infinite;
+            transform-origin: center;
+            display: inline-block;
+        }
+        
+        /* Synchronized Vitals Card Flash Keyframes */
+        @keyframes card-flash-red {
+            0%, 100% { border-color: rgba(255, 255, 255, 0.05); box-shadow: none; }
+            15% { border-color: rgba(239, 68, 68, 0.45); box-shadow: 0 0 20px rgba(239, 68, 68, 0.22); }
+        }
+        @keyframes card-flash-cyan {
+            0%, 100% { border-color: rgba(255, 255, 255, 0.05); box-shadow: none; }
+            15% { border-color: rgba(6, 182, 212, 0.45); box-shadow: 0 0 20px rgba(6, 182, 212, 0.22); }
+        }
+        @keyframes card-flash-amber {
+            0%, 100% { border-color: rgba(255, 255, 255, 0.05); box-shadow: none; }
+            15% { border-color: rgba(245, 158, 11, 0.45); box-shadow: 0 0 20px rgba(245, 158, 11, 0.22); }
+        }
+        .card-flash-active {
+            animation-timing-function: ease-in-out;
+            animation-iteration-count: infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black">
+
+    <!-- React Mounting Target -->
+    <div id="root"></div>
+
+    <!-- React Script Block -->
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Custom Component: Physics-based Lerping HUD Reticle Cursor with Click Compression
+        const CustomCursor = () => {
+            const [isVisible, setIsVisible] = useState(false);
+            const cursorRef = useRef({
+                targetX: -100,
+                targetY: -100,
+                currentX: -100,
+                currentY: -100,
+                scale: 1,
+                targetScale: 1
+            });
+
+            const outerRingRef = useRef(null);
+            const innerDotRef = useRef(null);
+            const [hovering, setHovering] = useState(false);
+
+            useEffect(() => {
+                const hasMouse = window.matchMedia('(pointer: fine)').matches;
+                if (!hasMouse) return;
+
+                setIsVisible(true);
+                document.body.style.cursor = 'none';
+
+                const handleMouseMove = (e) => {
+                    const c = cursorRef.current;
+                    const dx = e.clientX - c.targetX;
+                    const dy = e.clientY - c.targetY;
+                    const speed = Math.sqrt(dx * dx + dy * dy);
+                    
+                    c.targetX = e.clientX;
+                    c.targetY = e.clientY;
+                    
+                    // Velocity based target scale expansion
+                    c.targetScale = 1.0 + Math.min(speed * 0.02, 0.95);
+                };
+
+                const handleMouseOver = (e) => {
+                    const target = e.target;
+                    const isClickable = target.closest('button') || target.closest('a') || window.getComputedStyle(target).cursor === 'pointer';
+                    setHovering(!!isClickable);
+                };
+
+                const handleMouseDown = () => {
+                    // Force compression on click
+                    cursorRef.current.scale = 0.15;
+                };
+
+                window.addEventListener('mousemove', handleMouseMove);
+                window.addEventListener('mouseover', handleMouseOver);
+                window.addEventListener('mousedown', handleMouseDown);
+
+                let animationFrameId;
+
+                const updatePhysics = () => {
+                    const c = cursorRef.current;
+                    
+                    // Easing lerp equations (0.10 factor)
+                    c.currentX += (c.targetX - c.currentX) * 0.10;
+                    c.currentY += (c.targetY - c.currentY) * 0.10;
+                    
+                    const baseScale = hovering ? 1.55 : 1.0;
+                    c.scale += ((c.targetScale * baseScale) - c.scale) * 0.15;
+                    
+                    // Decay velocity scale back to normal
+                    c.targetScale += (1.0 - c.targetScale) * 0.08;
+
+                    if (outerRingRef.current) {
+                        outerRingRef.current.style.left = c.currentX + 'px';
+                        outerRingRef.current.style.top = c.currentY + 'px';
+                        outerRingRef.current.style.transform = 'translate(-50%, -50%) scale(' + c.scale + ')';
+                        
+                        if (hovering) {
+                            outerRingRef.current.style.borderColor = 'rgba(6, 182, 212, 0.95)';
+                            outerRingRef.current.style.backgroundColor = 'rgba(6, 182, 212, 0.06)';
+                            outerRingRef.current.style.boxShadow = '0 0 16px rgba(6, 182, 212, 0.45)';
+                        } else {
+                            outerRingRef.current.style.borderColor = 'rgba(6, 182, 212, 0.8)';
+                            outerRingRef.current.style.backgroundColor = 'transparent';
+                            outerRingRef.current.style.boxShadow = 'none';
+                        }
+                    }
+
+                    if (innerDotRef.current) {
+                        innerDotRef.current.style.left = c.targetX + 'px';
+                        innerDotRef.current.style.top = c.targetY + 'px';
+                    }
+
+                    animationFrameId = requestAnimationFrame(updatePhysics);
+                };
+
+                updatePhysics();
+
+                return () => {
+                    window.removeEventListener('mousemove', handleMouseMove);
+                    window.removeEventListener('mouseover', handleMouseOver);
+                    window.removeEventListener('mousedown', handleMouseDown);
+                    document.body.style.cursor = 'default';
+                    cancelAnimationFrame(animationFrameId);
+                };
+            }, [hovering]);
+
+            if (!isVisible) return null;
+
+            const initialOuterStyle = {
+                width: '24px',
+                height: '24px',
+                left: '-100px',
+                top: '-100px',
+                transform: 'translate(-50%, -50%) scale(1)'
+            };
+
+            const initialInnerStyle = {
+                left: '-100px',
+                top: '-100px'
+            };
+
+            return (
+                <React.Fragment>
+                    <div 
+                        ref={outerRingRef}
+                        className="fixed pointer-events-none z-50 rounded-full border border-cyan-400/80"
+                        style={initialOuterStyle}
+                    />
+                    <div 
+                        ref={innerDotRef}
+                        className="fixed pointer-events-none z-50 h-1.5 w-1.5 rounded-full bg-cyan-400 -translate-x-1/2 -translate-y-1/2"
+                        style={initialInnerStyle}
+                    />
+                </React.Fragment>
+            );
+        };
+
+        // ScrollReveal Viewport Slide-In Animation Component
+        const ScrollReveal = ({ children }) => {
+            const elementRef = useRef(null);
+            const [revealed, setRevealed] = useState(false);
+
+            useEffect(() => {
+                const observer = new IntersectionObserver(
+                    ([entry]) => {
+                        if (entry.isIntersecting) {
+                            setRevealed(true);
+                            observer.unobserve(entry.target);
+                        }
+                    },
+                    {
+                        threshold: 0.08,
+                        rootMargin: '0px 0px -50px 0px'
+                    }
+                );
+
+                if (elementRef.current) {
+                    observer.observe(elementRef.current);
+                }
+
+                return () => observer.disconnect();
+            }, []);
+
+            return (
+                <div 
+                    ref={elementRef}
+                    className={'transition-all duration-1000 cubic-bezier(0.175, 0.885, 0.32, 1.275) ' + (revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12')}
+                >
+                    {children}
+                </div>
+            );
+        };
+
+        // Custom Component: High-Fidelity SVG Face Mesh Avatar Visualizer
+        const FaceMeshVisualizer = ({ driverState, bac }) => {
+            const [time, setTime] = useState(0);
+            const requestRef = useRef();
+
+            useEffect(() => {
+                const animate = () => {
+                    setTime(prev => prev + 1);
+                    requestRef.current = requestAnimationFrame(animate);
+                };
+                requestRef.current = requestAnimationFrame(animate);
+                return () => cancelAnimationFrame(requestRef.current);
+            }, []);
+
+            // Dynamic head parameters bound to Tactical states
+            let headX = 0;
+            let headY = 0;
+            let headAngle = 0;
+            let eyeHeight = 8; 
+            let mouthHeight = 4; 
+            let mouthWidth = 24;
+            let meshColor = "rgba(6, 182, 212, 0.4)";
+            let nodeColor = "#06b6d4";
+            let pupilOffset = Math.sin(time * 0.03) * 3;
+
+            if (driverState === "Drowsy") {
+                headX = 0;
+                headY = 14; 
+                headAngle = 2;
+                eyeHeight = 1.0; 
+                mouthHeight = 22; 
+                mouthWidth = 18;
+                meshColor = "rgba(245, 158, 11, 0.45)";
+                nodeColor = "#f59e0b";
+                pupilOffset = 0;
+            } else if (driverState === "Medical Emergency") {
+                headX = -20;
+                headY = 20; 
+                headAngle = -18;
+                eyeHeight = 0.2; 
+                mouthHeight = 10; 
+                mouthWidth = 14;
+                const pulse = 0.15 + Math.sin(time * 0.08) * 0.1;
+                meshColor = 'rgba(239, 68, 68, ' + pulse + ')';
+                nodeColor = "#ef4444";
+                pupilOffset = 0;
+            } else if (bac >= 0.08) {
+                headX = Math.sin(time * 0.05) * 6;
+                headY = Math.cos(time * 0.03) * 2;
+                headAngle = Math.sin(time * 0.04) * 4;
+                eyeHeight = 4.5; 
+                mouthHeight = 4;
+                mouthWidth = 24;
+                meshColor = "rgba(234, 179, 8, 0.4)";
+                nodeColor = "#eab308";
+                pupilOffset = Math.sin(time * 0.09) * 4.5; 
+            }
+
+            const headCenter = { x: 100, y: 95 };
+            const transformStr = 'translate(' + headX + ', ' + headY + ') rotate(' + headAngle + ', ' + headCenter.x + ', ' + headCenter.y + ')';
+
+            return (
+                <div className="w-full h-full relative flex items-center justify-center bg-[#030508] p-4 rounded-[1.5rem] overflow-hidden border border-slate-900">
+                    <div className="absolute inset-0 hud-grid opacity-30 pointer-events-none"></div>
+
+                    <svg 
+                        viewBox="0 0 200 200" 
+                        className="w-full h-full relative z-10 transition-all duration-700 ease-out"
+                        style={{ filter: 'drop-shadow(0 0 10px ' + nodeColor + '40)' }}
+                    >
+                        <g transform={transformStr} className="transition-transform duration-700 ease-out">
+                            {/* Head Outline Contour */}
+                            <path 
+                                d="M 60,60 C 60,35 140,35 140,60 C 140,90 145,115 135,135 C 125,155 115,165 100,165 C 85,165 75,155 65,135 C 55,115 60,90 60,60 Z" 
+                                fill="none" 
+                                stroke={meshColor} 
+                                strokeWidth="1.5" 
+                                strokeDasharray="4 2"
+                            />
+                            
+                            {/* Neck base */}
+                            <path 
+                                d="M 85,160 L 75,185 M 115,160 L 125,185" 
+                                stroke={meshColor} 
+                                strokeWidth="1.5"
+                            />
+
+                            {/* Left Eye */}
+                            <ellipse 
+                                cx="80" 
+                                cy="85" 
+                                rx="12" 
+                                ry={eyeHeight} 
+                                fill="none" 
+                                stroke={nodeColor} 
+                                strokeWidth="2" 
+                            />
+                            {eyeHeight > 1.8 && (
+                                <circle cx={80 + pupilOffset} cy="85" r="4.5" fill={nodeColor} opacity="0.8" />
+                            )}
+
+                            {/* Right Eye */}
+                            <ellipse 
+                                cx="120" 
+                                cy="85" 
+                                rx="12" 
+                                ry={eyeHeight} 
+                                fill="none" 
+                                stroke={nodeColor} 
+                                strokeWidth="2" 
+                            />
+                            {eyeHeight > 1.8 && (
+                                <circle cx={120 + pupilOffset} cy="85" r="4.5" fill={nodeColor} opacity="0.8" />
+                            )}
+
+                            {/* Eyebrows */}
+                            <path d="M 68,75 Q 80,70 90,77" stroke={meshColor} strokeWidth="1.5" fill="none" />
+                            <path d="M 132,75 Q 120,70 110,77" stroke={meshColor} strokeWidth="1.5" fill="none" />
+
+                            {/* Nose bridge & tip */}
+                            <path d="M 100,75 L 100,115 L 94,122 L 106,122 Z" stroke={meshColor} strokeWidth="1.5" fill="none" />
+
+                            {/* Mouth */}
+                            <ellipse 
+                                cx="100" 
+                                cy="140" 
+                                rx={mouthWidth} 
+                                ry={mouthHeight} 
+                                fill="none" 
+                                stroke={nodeColor} 
+                                strokeWidth="2" 
+                            />
+
+                            {/* Biometric Landmark Mesh Lines */}
+                            <g opacity="0.35">
+                                <line x1="100" y1="40" x2="80" y2="52" stroke={nodeColor} strokeWidth="0.75" />
+                                <line x1="100" y1="40" x2="120" y2="52" stroke={nodeColor} strokeWidth="0.75" />
+                                <line x1="68" y1="75" x2="52" y2="70" stroke={nodeColor} strokeWidth="0.75" />
+                                <line x1="132" y1="75" x2="148" y2="70" stroke={nodeColor} strokeWidth="0.75" />
+                                <line x1="80" y1="85" x2="60" y2="105" stroke={nodeColor} strokeWidth="0.75" />
+                                <line x1="120" y1="85" x2="140" y2="105" stroke={nodeColor} strokeWidth="0.75" />
+                                <line x1="100" y1="122" x2="75" y2="135" stroke={nodeColor} strokeWidth="0.75" />
+                                <line x1="100" y1="122" x2="125" y2="135" stroke={nodeColor} strokeWidth="0.75" />
+                                <line x1="75" y1="135" x2="100" y2="165" stroke={nodeColor} strokeWidth="0.75" />
+                                <line x1="125" y1="135" x2="100" y2="165" stroke={nodeColor} strokeWidth="0.75" />
+                            </g>
+
+                            {/* Landmark Nodes */}
+                            <g opacity="0.9">
+                                <circle cx="100" cy="40" r="2.5" fill={nodeColor} />
+                                <circle cx="80" cy="52" r="2.5" fill={nodeColor} />
+                                <circle cx="120" cy="52" r="2.5" fill={nodeColor} />
+                                <circle cx="80" cy="85" r="2.5" fill={nodeColor} />
+                                <circle cx="120" cy="85" r="2.5" fill={nodeColor} />
+                                <circle cx="100" cy="122" r="2.5" fill={nodeColor} />
+                                <circle cx="75" cy="135" r="2.5" fill={nodeColor} />
+                                <circle cx="125" cy="135" r="2.5" fill={nodeColor} />
+                                <circle cx="100" cy="140" r="2.5" fill={nodeColor} />
+                                <circle cx="100" cy="165" r="2.5" fill={nodeColor} />
+                            </g>
+
+                            {/* Eye HUD target brackets */}
+                            {driverState !== "Medical Emergency" && (
+                                <g opacity="0.6" stroke={nodeColor} strokeWidth="1" fill="none">
+                                    <path d="M 64,80 L 64,74 L 70,74" />
+                                    <path d="M 96,80 L 96,74 L 90,74" />
+                                    <path d="M 64,90 L 64,96 L 70,96" />
+                                    <path d="M 96,90 L 96,96 L 90,96" />
+                                    <path d="M 104,80 L 104,74 L 110,74" />
+                                    <path d="M 136,80 L 136,74 L 130,74" />
+                                    <path d="M 104,90 L 104,96 L 110,96" />
+                                    <path d="M 136,90 L 136,96 L 130,96" />
+                                </g>
+                            )}
+                        </g>
+
+                        {/* Vector metadata strings */}
+                        <g fontFamily="JetBrains Mono" fontSize="6.5" fill={nodeColor} opacity="0.75">
+                            <text x="10" y="20">TRACKING_STATUS: RESOLVED</text>
+                            <text x="10" y="30">FACIAL_NODES: 68/68 ACTIVE</text>
+                            <text x="10" y="180">EAR_RATIO: {eyeHeight / 10}</text>
+                            <text x="130" y="180">HEAD_YAW: {headAngle}°</text>
+                        </g>
+                    </svg>
+                </div>
+            );
+        };
+
+        // Custom Component: Typewriter details description
+        const Typewriter = ({ text }) => {
+            const [displayedText, setDisplayedText] = useState('');
+            
+            useEffect(() => {
+                setDisplayedText('');
+                let i = 0;
+                const interval = setInterval(() => {
+                    setDisplayedText((prev) => prev + text.charAt(i));
+                    i++;
+                    if (i >= text.length) {
+                        clearInterval(interval);
+                    }
+                }, 8);
+                return () => clearInterval(interval);
+            }, [text]);
+
+            return <span>{displayedText}</span>;
+        };
+
+        // Custom Component: Rolling Speedometer Telemetry Counter
+        const AnimatedCounter = ({ value, duration = 350 }) => {
+            const [displayValue, setDisplayValue] = useState(value);
+            
+            useEffect(() => {
+                let startTimestamp = null;
+                const startVal = parseFloat(displayValue);
+                const endVal = parseFloat(value);
+                if (isNaN(endVal) || isNaN(startVal)) {
+                    setDisplayValue(value);
+                    return;
+                }
+                
+                const step = (timestamp) => {
+                    if (!startTimestamp) startTimestamp = timestamp;
+                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                    const current = startVal + progress * (endVal - startVal);
+                    
+                    if (Number.isInteger(endVal)) {
+                        setDisplayValue(Math.floor(current));
+                    } else {
+                        setDisplayValue(current.toFixed(3));
+                    }
+                    
+                    if (progress < 1) {
+                        window.requestAnimationFrame(step);
+                    }
+                };
+                window.requestAnimationFrame(step);
+            }, [value]);
+
+            return <span className="font-mono tracking-wider">{displayValue}</span>;
+        };
+
+        // Custom Component: Responsive Canvas-based ECG waves bound to simulator state
+        const EcgVisualizer = ({ bpm, driverState, bac }) => {
+            const canvasRef = useRef(null);
+            const stateStartTimeRef = useRef(Date.now());
+            const prevStateRef = useRef(driverState);
+            
+            useEffect(() => {
+                if (prevStateRef.current !== driverState) {
+                    stateStartTimeRef.current = Date.now();
+                    prevStateRef.current = driverState;
+                }
+            }, [driverState]);
+            
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                
+                let animationId;
+                let offset = 0;
+                
+                const render = () => {
+                    if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+                        canvas.width = canvas.clientWidth;
+                        canvas.height = canvas.clientHeight;
+                    }
+                    
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    let color = '#06b6d4'; // Active - Cyan
+                    if (driverState === "Drowsy") {
+                        color = '#f59e0b'; // Fatigue - Amber
+                    } else if (driverState === "Medical Emergency") {
+                        color = '#ef4444'; // Medical - Red
+                    } else if (bac >= 0.08) {
+                        color = '#6366f1'; // Alcohol - Indigo
+                    }
+                    
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2.5;
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = color;
+                    
+                    ctx.beginPath();
+                    const midY = canvas.height / 2;
+                    const w = canvas.width;
+                    
+                    // Wave cycle length based on BPM
+                    const cycleWidth = Math.max(100, (60 / bpm) * 320);
+                    
+                    for (let x = 0; x < w; x++) {
+                        let cycleX = (x + offset) % cycleWidth;
+                        let y = midY;
+                        
+                        if (driverState === "Medical Emergency") {
+                            const timeElapsed = Date.now() - stateStartTimeRef.current;
+                            if (timeElapsed < 6000) {
+                                // 1. Ventricular Tachycardia phase
+                                y = midY + Math.sin(cycleX * 0.16) * 38 + Math.sin(cycleX * 0.35) * 12;
+                            } else {
+                                // 2. Degraded flatline phase
+                                y = midY + (Math.sin(x * 0.05) * 0.8);
+                            }
+                        } else if (bac >= 0.08) {
+                            // Erratic chemical micro-spikes
+                            if (cycleX > 15 && cycleX < 30) {
+                                let p = (cycleX - 15) / 15;
+                                y = midY - Math.sin(p * Math.PI) * 7;
+                            } else if (cycleX >= 34 && cycleX < 38) {
+                                let q = (cycleX - 34) / 4;
+                                y = midY + (q * 10);
+                            } else if (cycleX >= 38 && cycleX < 44) {
+                                let r = (cycleX - 38) / 6;
+                                y = (midY + 10) - (Math.sin(r * Math.PI) * 65);
+                            } else if (cycleX >= 44 && cycleX < 49) {
+                                let s = (cycleX - 44) / 5;
+                                y = midY + (Math.sin(s * Math.PI) * 22);
+                            } else if (cycleX >= 58 && cycleX < 78) {
+                                let t = (cycleX - 58) / 20;
+                                y = midY - Math.sin(t * Math.PI) * 12;
+                            }
+                            // Inject irregular spikes on flat areas
+                            if (cycleX > 100 && cycleX < 105) {
+                                y += (Math.random() - 0.5) * 6;
+                            }
+                        } else {
+                            // Standard active vitals PQRST curve
+                            if (cycleX > 15 && cycleX < 30) {
+                                let p = (cycleX - 15) / 15;
+                                y = midY - Math.sin(p * Math.PI) * 7;
+                            } else if (cycleX >= 34 && cycleX < 38) {
+                                let q = (cycleX - 34) / 4;
+                                y = midY + (q * 10);
+                            } else if (cycleX >= 38 && cycleX < 44) {
+                                let r = (cycleX - 38) / 6;
+                                y = (midY + 10) - (Math.sin(r * Math.PI) * 65);
+                            } else if (cycleX >= 44 && cycleX < 49) {
+                                let s = (cycleX - 44) / 5;
+                                y = midY + (Math.sin(s * Math.PI) * 22);
+                            } else if (cycleX >= 58 && cycleX < 78) {
+                                let t = (cycleX - 58) / 20;
+                                y = midY - Math.sin(t * Math.PI) * 12;
+                            }
+                        }
+                        
+                        if (x === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    }
+                    
+                    ctx.stroke();
+                    
+                    offset += Math.max(1.8, bpm / 22);
+                    animationId = window.requestAnimationFrame(render);
+                };
+                
+                render();
+                
+                return () => {
+                    window.cancelAnimationFrame(animationId);
+                };
+            }, [bpm, driverState, bac]);
+
+            return (
+                <div className="backdrop-blur-2xl bg-slate-950/20 border border-white/5 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] p-6 flex flex-col relative overflow-hidden hover:border-cyan-500/30 transition-all duration-500">
+                    <div className="absolute top-[1px] left-12 px-3 py-0.5 bg-slate-950 border-x border-b border-white/5 rounded-b-md text-[7px] font-mono text-cyan-500/80 tracking-widest uppercase">CARDIAC_CORE</div>
+                    <div className="absolute top-0 left-12 right-12 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent"></div>
+                    
+                    <div className="flex items-center justify-between mb-3 border-b border-slate-900/60 pb-2 mt-2">
+                        <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
+                            <h3 className="text-xs font-bold text-slate-300 tracking-widest font-mono uppercase">REAL-TIME ECG WAVEFORM</h3>
+                        </div>
+                        <span className="text-[9px] font-mono text-slate-500 tracking-widest font-bold uppercase">FREQ: {bpm} BPM</span>
+                    </div>
+
+                    <div className="w-full bg-[#030508] border border-slate-900 rounded-[1.5rem] p-2 relative overflow-hidden">
+                        <div className="absolute inset-0 hud-grid pointer-events-none opacity-45"></div>
+                        <canvas ref={canvasRef} height="120" className="w-full relative z-10" />
+                    </div>
+                    <span className="text-[8.5px] text-slate-600 font-mono tracking-wider mt-2">Continuous cardiac sinus sweep</span>
+                </div>
+            );
+        };
+
+        // Custom Component: Rolling Live system Console Output
+        const ConsoleLogStream = ({ driverState, bac }) => {
+            const [logs, setLogs] = useState([]);
+            const consoleEndRef = useRef(null);
+
+            const logTemplates = [
+                "Analyzing pupil dilation dynamics...",
+                "Scanning cabin MQ-3 gas concentration levels...",
+                "Evaluating steering torque response delay...",
+                "Parsing facial landmarks: Eye Aspect Ratio (EAR) nominal...",
+                "Streaming vitals matrix database... [SECURE]",
+                "ECU ignition lock diagnostic check: PASS",
+                "Validating telemetry package checksums...",
+                "Checking cellular GPS coordinates link...",
+                "Galvanic skin resistance check: ACTIVE"
+            ];
+
+            useEffect(() => {
+                setLogs([
+                    `[${new Date().toLocaleTimeString()}] [SYS_INIT]: Initializing SAFEWARE ADSS Core...`,
+                    `[${new Date().toLocaleTimeString()}] [SYS_INIT]: Connecting biometrics matrix interfaces...`,
+                    `[${new Date().toLocaleTimeString()}] [SYS_INIT]: Camera streaming bound to /video_feed.`
+                ]);
+            }, []);
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    let message = logTemplates[Math.floor(Math.random() * logTemplates.length)];
+                    
+                    if (driverState === "Drowsy") {
+                        const drowsyLogs = [
+                            "WARNING: Ocular aspect ratio (EAR) dipping below 0.15 threshold!",
+                            "AI attention network triggers alert level 2 [FATIGUE]",
+                            "Continuous yawn frequencies detected.",
+                            "Preemptively warning steering actuators..."
+                        ];
+                        message = drowsyLogs[Math.floor(Math.random() * drowsyLogs.length)];
+                    } else if (driverState === "Medical Emergency") {
+                        const emergencyLogs = [
+                            "CRITICAL: Arrhythmia/bradycardia crash detected!",
+                            "Deploying ABS soft-deceleration cruise parameters...",
+                            "Activating safety warning sirens and hazards...",
+                            "Transmitting location vectors to emergency response networks..."
+                        ];
+                        message = emergencyLogs[Math.floor(Math.random() * emergencyLogs.length)];
+                    } else if (bac >= 0.08) {
+                        const alcoholLogs = [
+                            "WARNING: MQ-3 breath analyzer reports BAC >= 0.08% limit!",
+                            "Ignition interlock active: BLOCKING ECU ignition signals.",
+                            "Vehicle status: Immobilized."
+                        ];
+                        message = alcoholLogs[Math.floor(Math.random() * alcoholLogs.length)];
+                    }
+
+                    const timestamp = new Date().toLocaleTimeString();
+                    const logType = driverState === "Medical Emergency" || bac >= 0.08 ? "SYS_ERR" : (driverState === "Drowsy" ? "SYS_WARN" : "SYS_LOG");
+                    
+                    setLogs(prev => [...prev.slice(-14), `[${timestamp}] [${logType}]: ${message}`]);
+                }, 2500);
+
+                return () => clearInterval(interval);
+            }, [driverState, bac]);
+
+            useEffect(() => {
+                if (consoleEndRef.current) {
+                    consoleEndRef.current.scrollIntoView({ behavior: 'smooth' });
+                }
+            }, [logs]);
+
+            return (
+                <div className="backdrop-blur-2xl bg-slate-950/20 border border-white/5 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] p-6">
+                    <div className="flex items-center justify-between border-b border-slate-900/60 pb-2 mb-3">
+                        <span className="text-xs font-bold text-slate-300 font-mono tracking-widest uppercase">REAL-TIME SYSTEM CONSOLE</span>
+                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    </div>
+                    <div className="h-32 overflow-y-auto font-mono text-[10px] text-cyan-400/80 space-y-1 scrollbar-none">
+                        {logs.map((log, idx) => {
+                            let color = "text-cyan-400/80";
+                            if (log.includes("[SYS_ERR]")) color = "text-red-400 font-bold";
+                            else if (log.includes("[SYS_WARN]")) color = "text-amber-400";
+                            return (
+                                <div key={idx} className={color} style={{ leadingRelaxed: 'true' }}>
+                                    {log}
+                                </div>
+                            );
+                        })}
+                        <div ref={consoleEndRef} />
+                    </div>
+                </div>
+            );
+        };
+
+        // Main App Component
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('presentation');
+            const [telemetry, setTelemetry] = useState({
+                ignition_enabled: true,
+                driver_state: 'Active',
+                heart_rate: 72,
+                blood_pressure_sys: 120,
+                blood_pressure_dia: 80,
+                bac: 0.00
+            });
+            const [hoveredNode, setHoveredNode] = useState('safometer');
+            const audioCtxRef = useRef(null);
+
+            // Fix the automatic scroll bug on mount
+            useEffect(() => {
+                window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+            }, []);
+
+            // Flowchart nodes databases
+            const flowData = {
+                safometer: {
+                    title: "1. SAFOMETER — MULTI-MODAL VITALS MATRIX",
+                    color: "text-cyber-cyan",
+                    text: "Continuous MQ-3 gas-phase monitoring coupled with steering wheel galvanic arrays mapping driver state. Establishes the baseline eye-tracking ratios and biometric profiles before unlocking safety relays."
+                },
+                safetylock: {
+                    title: "2. SAFETY LOCK — COGNITIVE IGNITION OVERRIDE",
+                    color: "text-cyber-emerald",
+                    text: "Automated engine restriction. If gas sensors record breath alcohol >= 0.08% BAC or vitals report cardiovascular arrhythmia, the Safety Lock interrupts the ignition, isolating engine relays to secure passenger safety."
+                },
+                emergency: {
+                    title: "3. ESCAPE & SOS — DYNAMIC MITIGATION PROTOCOLS",
+                    color: "text-cyber-red",
+                    text: "Deploys in transit during attention collapse or medical crises. Slows the vehicle gradually via automatic braking, triggers emergency hazards, unlocks doors, and broadcasts telemetry to emergency responders."
+                }
+            };
+
+            // Server-Sent Events Telemetry Stream
+            useEffect(() => {
+                const eventSource = new EventSource('/api/telemetry_stream');
+                
+                eventSource.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    setTelemetry(data);
+                };
+                
+                eventSource.onerror = (err) => {
+                    console.error("SSE stream telemetry error:", err);
+                };
+                
+                return () => {
+                    eventSource.close();
+                };
+            }, []);
+
+            // Play alerts warnings
+            useEffect(() => {
+                const state = telemetry.driver_state;
+                if (state === "Drowsy" || state === "Medical Emergency") {
+                    const interval = setInterval(() => {
+                        playAlarmChime();
+                    }, 2200);
+                    return () => clearInterval(interval);
+                }
+            }, [telemetry.driver_state]);
+
+            const playAlarmChime = () => {
+                try {
+                    if (!audioCtxRef.current) {
+                        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    const ctx = audioCtxRef.current;
+                    const now = ctx.currentTime;
+                    
+                    const triggerBeep = (time, freq, dur) => {
+                        const osc1 = ctx.createOscillator();
+                        const osc2 = ctx.createOscillator();
+                        const gainNode = ctx.createGain();
+                        
+                        osc1.type = 'sine';
+                        osc1.frequency.setValueAtTime(freq, time);
+                        
+                        osc2.type = 'triangle';
+                        osc2.frequency.setValueAtTime(freq / 2, time);
+                        
+                        gainNode.gain.setValueAtTime(0, time);
+                        gainNode.gain.linearRampToValueAtTime(0.08, time + 0.02);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, time + dur);
+                        
+                        osc1.connect(gainNode);
+                        osc2.connect(gainNode);
+                        gainNode.connect(ctx.destination);
+                        
+                        osc1.start(time);
+                        osc1.stop(time + dur);
+                        osc2.start(time);
+                        osc2.stop(time + dur);
+                    };
+                    
+                    triggerBeep(now, 880, 0.2);
+                    triggerBeep(now + 0.25, 880, 0.2);
+                } catch(e) {
+                    console.warn("Audio warning synth blocked:", e);
+                }
+            };
+
+            const triggerStateChange = (state, simAlcohol) => {
+                if (!audioCtxRef.current) {
+                    audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                fetch('/api/set_state', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ driver_state: state, simulate_alcohol: simAlcohol })
+                })
+                .then(res => res.json())
+                .catch(err => console.error("Sim state change failed:", err));
+            };
+
+            // Flash card dynamic theme classes
+            const getCardFlashAnimName = () => {
+                if (telemetry.driver_state === "Medical Emergency") return "card-flash-red";
+                if (telemetry.driver_state === "Drowsy") return "card-flash-amber";
+                return "card-flash-cyan";
+            };
+
+            // Vignettes layouts
+            let vignetteClass = "fixed inset-0 pointer-events-none transition-all duration-700 z-50 opacity-0";
+            let warningBanner = null;
+            let hubAura = "grid lg:grid-cols-12 gap-8 transition-all duration-500 p-2 rounded-[2rem] spring-transition";
+            let hudBracketsColor = "border-emerald-500";
+            let sweepLaserColor = "from-transparent via-emerald-500 to-transparent";
+
+            if (telemetry.driver_state === "Drowsy") {
+                vignetteClass = "fixed inset-0 pointer-events-none transition-all duration-700 z-50 opacity-100 animate-vignette-amber";
+                warningBanner = "[SYSTEM WARNING: DRIVER DROWSINESS DETECTED]";
+                hubAura = "grid lg:grid-cols-12 gap-8 transition-all duration-500 p-2 rounded-[2rem] border border-amber-500/40 bg-amber-950/5 shadow-[0_0_40px_rgba(245,158,11,0.25)] spring-transition";
+                hudBracketsColor = "border-amber-500";
+                sweepLaserColor = "from-transparent via-amber-500 to-transparent";
+            } else if (telemetry.driver_state === "Medical Emergency") {
+                vignetteClass = "fixed inset-0 pointer-events-none transition-all duration-700 z-50 opacity-100 animate-vignette-red";
+                warningBanner = "[CRITICAL SYSTEM EMERGENCY DETECTED]";
+                hubAura = "grid lg:grid-cols-12 gap-8 transition-all duration-500 p-2 rounded-[2rem] border border-red-500/40 bg-red-950/5 shadow-[0_0_45px_rgba(239,68,68,0.35)] spring-transition";
+                hudBracketsColor = "border-red-500";
+                sweepLaserColor = "from-transparent via-red-500 to-transparent";
+            }
+
+            // Declare style variables to bypass Jinja parser
+            const hrCardStyle = {
+                animationName: getCardFlashAnimName(),
+                animationDuration: (60 / telemetry.heart_rate) + 's'
+            };
+
+            const heartIconStyle = { 
+                animationDuration: (60 / telemetry.heart_rate) + 's' 
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col relative overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-purple-950/20 to-black select-none">
+                    {/* HUD Target Cursor Follower */}
+                    <CustomCursor />
+
+                    {/* Vignette Overlay */}
+                    <div className={vignetteClass}></div>
+
+                    {/* Header */}
+                    <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-cyber-obsidian/75 border-b border-slate-900/60 px-6 py-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                                <svg className="h-6 w-6 text-cyber-obsidian" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <span className="font-extrabold text-xl tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-cyan-400 font-display">SAFEWARE</span>
+                                <span className="text-[10px] block text-cyan-500 tracking-widest font-bold uppercase -mt-1 font-mono">ADSS SECURE HUB</span>
+                            </div>
+                        </div>
+
+                        {/* Banner */}
+                        {warningBanner && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-950/80 border border-red-800 rounded font-mono text-[10px] font-bold text-red-500 animate-pulse">
+                                <span>{warningBanner}</span>
+                            </div>
+                        )}
+
+                        {/* Navigation Tabs */}
+                        <nav className="flex p-1 bg-slate-950/85 border border-slate-900 rounded-xl">
+                            <button 
+                                onClick={() => setActiveTab('presentation')} 
+                                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 font-mono ${activeTab === 'presentation' ? 'bg-gradient-to-r from-cyan-600 to-cyan-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
+                            >
+                                Investor Presentation
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('dashboard')} 
+                                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 font-mono ${activeTab === 'dashboard' ? 'bg-gradient-to-r from-cyan-600 to-cyan-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
+                            >
+                                Engineering Hub
+                            </button>
+                        </nav>
+                    </header>
+
+                    {/* Main Sections */}
+                    <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative space-y-12">
+                        
+                        {/* Tab 1: Presentation (Landing Page) */}
+                        {activeTab === 'presentation' && (
+                            <div className="space-y-24 transition-all duration-500">
+                                
+                                {/* Hero area */}
+                                <div className="relative py-16 flex flex-col items-center text-center max-w-4xl mx-auto">
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-gradient-to-tr from-cyan-500/10 to-indigo-600/10 rounded-full blur-[130px] pointer-events-none animate-pulse-slow"></div>
+
+                                    <span className="px-4 py-1.5 rounded-full text-[11px] font-bold bg-cyan-950/65 text-cyan-400 border border-cyan-800/40 uppercase tracking-widest mb-6 inline-block font-mono">
+                                        SECURE AUTOMATED ACCIDENT PREEMPTION
+                                    </span>
+                                    
+                                    <h1 className="text-4xl sm:text-7xl font-extrabold tracking-tight leading-none text-white font-display mb-6 uppercase">
+                                        Preventing Road Accidents <br />
+                                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-indigo-400 to-emerald-400">Before they occur.</span>
+                                    </h1>
+                                    
+                                    <p className="text-lg text-slate-400 font-light max-w-2xl mb-10 leading-relaxed">
+                                        SAFEWARE continuously samples steering telemetry, breath vapor index, and ocular metrics to isolate vehicle ignitions, stabilize speeds, and secure motorists before emergencies arise.
+                                    </p>
+
+                                    <div className="flex gap-4 relative z-10 font-mono">
+                                        <button onClick={() => setActiveTab('dashboard')} className="px-8 py-4 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-black font-semibold rounded-xl shadow-lg shadow-cyan-500/20 transition-all duration-300 transform hover:-translate-y-0.5">
+                                            Open Prototype Dashboard
+                                        </button>
+                                        <a href="#flowchart" className="px-8 py-4 bg-slate-900/60 border border-slate-800 hover:border-slate-700 text-zinc-200 font-semibold rounded-xl transition-all duration-300 flex items-center justify-center">
+                                            Review Logic Flow ↓
+                                        </a>
+                                    </div>
+                                </div>
+
+                                {/* Problem vs Solution Grid */}
+                                <div className="space-y-8">
+                                    <div className="text-center">
+                                        <h2 className="text-3xl font-bold tracking-tight text-white uppercase font-display">The Threat Matrix vs SAFEWARE</h2>
+                                        <p className="text-slate-500 text-sm mt-2 font-sans">Transforming passive vehicle feedback loops into proactive system overrides.</p>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                                        {/* Problem Card */}
+                                        <div className="backdrop-blur-2xl bg-slate-950/20 border border-white/5 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] p-8 relative overflow-hidden hover:border-cyan-500/30 transition-all duration-500 group">
+                                            <div className="absolute top-[1px] left-12 px-3 py-0.5 bg-slate-950 border-x border-b border-white/5 rounded-b-md text-[7px] font-mono text-red-400/85 tracking-widest uppercase">THREAT_LOG</div>
+                                            <div className="absolute top-0 left-12 right-12 h-[2px] bg-gradient-to-r from-transparent via-red-500/30 to-transparent"></div>
+                                            <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-3xl pointer-events-none"></div>
+                                            
+                                            <h3 className="text-xl font-bold text-red-400 flex items-center gap-2 mb-6 font-display uppercase tracking-wider mt-2">
+                                                <span className="p-2 rounded bg-red-950/50 text-red-500 text-sm font-sans">⚠️</span> Human Vulnerabilities
+                                            </h3>
+                                            <ul className="space-y-6 font-sans">
+                                                <li className="flex gap-4">
+                                                    <span className="text-red-500 font-bold mt-0.5">✕</span>
+                                                    <div>
+                                                        <h4 className="text-white font-medium">Fatigue & Sleep-Onset</h4>
+                                                        <p className="text-xs text-slate-400 leading-relaxed">Micro-sleeps take control of steering loops instantly, reducing motorist response times to zero.</p>
+                                                    </div>
+                                                </li>
+                                                <li className="flex gap-4">
+                                                    <span className="text-red-500 font-bold mt-0.5">✕</span>
+                                                    <div>
+                                                        <h4 className="text-white font-medium">Chemical Impairment</h4>
+                                                        <p className="text-xs text-slate-400 leading-relaxed">Drunk driving fatalities account for over a third of public transit incidents globally.</p>
+                                                    </div>
+                                                </li>
+                                                <li className="flex gap-4">
+                                                    <span className="text-red-500 font-bold mt-0.5">✕</span>
+                                                    <div>
+                                                        <h4 className="text-white font-medium">Sudden Cardiovascular Events</h4>
+                                                        <p className="text-xs text-slate-400 leading-relaxed">Cardiocirculatory strokes incapacitate operators, shifting moving vehicles into unguided mass threats.</p>
+                                                    </div>
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        {/* Solution Card */}
+                                        <div className="backdrop-blur-2xl bg-slate-950/20 border border-white/5 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] p-8 relative overflow-hidden hover:border-cyan-500/30 transition-all duration-500 group">
+                                            <div className="absolute top-[1px] left-12 px-3 py-0.5 bg-slate-950 border-x border-b border-white/5 rounded-b-md text-[7px] font-mono text-cyan-400 tracking-widest uppercase">MITIGATION_CORE</div>
+                                            <div className="absolute top-0 left-12 right-12 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent"></div>
+                                            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+                                            
+                                            <h3 className="text-xl font-bold text-cyan-400 flex items-center gap-2 mb-6 font-display uppercase tracking-wider mt-2">
+                                                <span className="p-2 rounded bg-cyan-950/50 text-cyan-400 text-sm font-sans">⚡</span> Active Mitigation Loop
+                                            </h3>
+                                            <ul className="space-y-6 font-sans">
+                                                <li className="flex gap-4">
+                                                    <span className="text-cyber-cyan font-bold mt-0.5">✓</span>
+                                                    <div>
+                                                        <h4 className="text-white font-medium">Computer Vision Eye aspect Ratio (EAR)</h4>
+                                                        <p className="text-xs text-slate-400 leading-relaxed font-sans">Continuous 68-point landmark tracking detects micro-sleeps and yawning curves instantly.</p>
+                                                    </div>
+                                                </li>
+                                                <li className="flex gap-4">
+                                                    <span className="text-cyber-cyan font-bold mt-0.5">✓</span>
+                                                    <div>
+                                                        <h4 className="text-white font-medium">Integrated MQ-3 Air Sampling</h4>
+                                                        <p className="text-xs text-slate-400 leading-relaxed font-sans">Pre-drive molecular detection prevents ignition flow if ethanol density crosses thresholds.</p>
+                                                    </div>
+                                                </li>
+                                                <li className="flex gap-4">
+                                                    <span className="text-cyber-cyan font-bold mt-0.5">✓</span>
+                                                    <div>
+                                                        <h4 className="text-white font-medium">Steering Vitals Diagnostics</h4>
+                                                        <p className="text-xs text-slate-400 leading-relaxed font-sans">Continuous electrocardiography scans for cardiac failure and immediately releases locks for first responders.</p>
+                                                    </div>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Flowchart ADSS Section */}
+                                <div id="flowchart" className="space-y-8 scroll-mt-24">
+                                    <div className="text-center">
+                                        <h2 className="text-3xl font-bold tracking-tight text-white uppercase font-display">ADSS SYSTEM PIPELINE</h2>
+                                        <p className="text-slate-500 text-sm mt-2 font-sans">Hover over or click nodes to inspect structural telemetry layers and logic gates.</p>
+                                    </div>
+
+                                    <div className="max-w-4xl mx-auto backdrop-blur-2xl bg-slate-950/20 border border-white/5 rounded-[2rem] p-8 hover:border-cyan-500/10 transition-all duration-500 relative">
+                                        <div className="absolute top-[1px] left-12 px-3 py-0.5 bg-slate-950 border-x border-b border-white/5 rounded-b-md text-[7px] font-mono text-cyan-500/85 tracking-widest uppercase">PIPELINE_ROUTE</div>
+                                        <div className="absolute top-0 left-12 right-12 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent"></div>
+                                        
+                                        {/* SVG Flowchart */}
+                                        <div className="w-full overflow-x-auto pb-4 mt-2">
+                                            <svg className="mx-auto" width="760" height="180" viewBox="0 0 760 180" fill="none">
+                                                {/* Node 1 */}
+                                                <g className="cursor-pointer group" onMouseOver={() => setHoveredNode('safometer')} onClick={() => setHoveredNode('safometer')}>
+                                                    <rect x="10" y="30" width="180" height="90" rx="20" fill={hoveredNode === 'safometer' ? '#0e1726' : '#090d16'} stroke={hoveredNode === 'safometer' ? '#06b6d4' : '#1e293b'} strokeWidth="1.5" className="transition-all duration-300" />
+                                                    <text x="100" y="70" textAnchor="middle" fill="#ffffff" fontSize="11" fontFamily="Syncopate" fontWeight="bold" letterSpacing="1">1. SAFOMETER</text>
+                                                    <text x="100" y="92" textAnchor="middle" fill="#06b6d4" fontSize="10" fontFamily="JetBrains Mono" fontWeight="600">VITALS SCANNERS</text>
+                                                </g>
+
+                                                {/* Connector 1 */}
+                                                <g>
+                                                    <path d="M 190,75 L 270,75" stroke="#1e293b" strokeWidth="4" />
+                                                    <path d="M 190,75 L 270,75" stroke="#06b6d4" strokeWidth="2" className="data-flow-line" />
+                                                </g>
+
+                                                {/* Node 2 */}
+                                                <g className="cursor-pointer group" onMouseOver={() => setHoveredNode('safetylock')} onClick={() => setHoveredNode('safetylock')}>
+                                                    <rect x="270" y="30" width="180" height="90" rx="20" fill={hoveredNode === 'safetylock' ? '#0c1a16' : '#090d16'} stroke={hoveredNode === 'safetylock' ? '#10b981' : '#1e293b'} strokeWidth="1.5" className="transition-all duration-300" />
+                                                    <text x="360" y="70" textAnchor="middle" fill="#ffffff" fontSize="11" fontFamily="Syncopate" fontWeight="bold" letterSpacing="1">2. SAFETY LOCK</text>
+                                                    <text x="360" y="92" textAnchor="middle" fill="#10b981" fontSize="10" fontFamily="JetBrains Mono" fontWeight="600">ECU RESTRICTION</text>
+                                                </g>
+
+                                                {/* Connector 2 */}
+                                                <g>
+                                                    <path d="M 450,75 L 530,75" stroke="#1e293b" strokeWidth="4" />
+                                                    <path d="M 450,75 L 530,75" stroke="#10b981" strokeWidth="2" className="data-flow-line" />
+                                                </g>
+
+                                                {/* Node 3 */}
+                                                <g className="cursor-pointer group" onMouseOver={() => setHoveredNode('emergency')} onClick={() => setHoveredNode('emergency')}>
+                                                    <rect x="530" y="30" width="220" height="90" rx="20" fill={hoveredNode === 'emergency' ? '#271215' : '#090d16'} stroke={hoveredNode === 'emergency' ? '#ef4444' : '#1e293b'} strokeWidth="1.5" className="transition-all duration-300" />
+                                                    <text x="640" y="70" textAnchor="middle" fill="#ffffff" fontSize="11" fontFamily="Syncopate" fontWeight="bold" letterSpacing="1">3. ESCAPE & SOS</text>
+                                                    <text x="640" y="92" textAnchor="middle" fill="#ef4444" fontSize="10" fontFamily="JetBrains Mono" fontWeight="600">MITIGATION UNIT</text>
+                                                </g>
+                                            </svg>
+                                        </div>
+
+                                        {/* Description details terminal */}
+                                        <div className="mt-6 p-6 rounded-xl bg-slate-950/60 border border-slate-900 min-h-[120px] transition-all duration-300 spring-transition">
+                                            <h4 className="text-xs font-bold text-white mb-2 flex items-center gap-2 font-mono uppercase tracking-wider">
+                                                <span className={`${flowData[hoveredNode].color} animate-pulse`}>◉</span> {flowData[hoveredNode].title}
+                                            </h4>
+                                            <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                                                <Typewriter text={flowData[hoveredNode].text} />
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Comprehensive Multi-Layer Core Narrative Case Study */}
+                                <div className="space-y-12">
+                                    <ScrollReveal>
+                                        <div className="text-center max-w-2xl mx-auto">
+                                            <span className="px-3 py-1 rounded bg-cyan-950/60 border border-cyan-900/40 text-cyan-400 font-mono text-[9.5px] font-bold tracking-widest uppercase">
+                                                ENGINEERING LOGS & NARRATIVE
+                                            </span>
+                                            <h2 className="text-3xl sm:text-4xl font-extrabold text-white uppercase font-display mt-4 tracking-tight">
+                                                SAFEWARE Narrative Case Study
+                                            </h2>
+                                            <p className="text-slate-500 text-xs sm:text-sm mt-2 leading-relaxed font-sans">
+                                                An end-to-end breakdown of the real-world crisis, system solution architecture, technical breakthroughs, and summit victory.
+                                            </p>
+                                        </div>
+                                    </ScrollReveal>
+
+                                    <div className="grid lg:grid-cols-3 gap-8">
+                                        
+                                        {/* Section A: The Crisis */}
+                                        <ScrollReveal>
+                                            <div className="backdrop-blur-2xl bg-slate-950/20 border border-white/5 p-8 rounded-[2rem] h-full flex flex-col justify-between hover:border-red-500/30 transition-all duration-500 group relative shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
+                                                <div className="absolute top-[1px] left-12 px-3 py-0.5 bg-slate-950 border-x border-b border-white/5 rounded-b-md text-[7px] font-mono text-red-500/85 tracking-widest uppercase">PHASE_01</div>
+                                                <div className="absolute top-0 left-12 right-12 h-[2px] bg-gradient-to-r from-transparent via-red-500/30 to-transparent"></div>
+                                                <div>
+                                                    <span className="font-mono text-red-500 text-[10px] font-bold tracking-widest block uppercase mb-4 mt-2">THE CRISIS // ROAD TRAGEDIES</span>
+                                                    <h3 className="text-xl font-bold text-white font-display uppercase tracking-wider mb-6">Real-World Vehicular Threats</h3>
+                                                    <p className="text-xs text-slate-400 leading-relaxed mb-6 font-sans">
+                                                        Over 1.3 million fatalities occur annually on global highways due to unmonitored motorist vulnerabilities. Fatigue-induced micro-sleeps, chemical alcohol impairment, and sudden acute cardiovascular events (heart attacks/strokes) render operators incapable of managing high-speed heavy machinery.
+                                                    </p>
+                                                </div>
+                                                <div className="border-t border-slate-900 pt-4 text-[10px] text-red-400/80 font-mono flex items-center gap-2">
+                                                    <span>⚠️</span>
+                                                    <span>Impact: Delayed dispatch, immediate loss of life.</span>
+                                                </div>
+                                            </div>
+                                        </ScrollReveal>
+
+                                        {/* Section B: The Platform Pipeline */}
+                                        <ScrollReveal>
+                                            <div className="backdrop-blur-2xl bg-slate-950/20 border border-white/5 p-8 rounded-[2rem] h-full flex flex-col justify-between hover:border-cyan-500/30 transition-all duration-500 group relative shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
+                                                <div className="absolute top-[1px] left-12 px-3 py-0.5 bg-slate-950 border-x border-b border-white/5 rounded-b-md text-[7px] font-mono text-cyan-400 tracking-widest uppercase">PHASE_02</div>
+                                                <div className="absolute top-0 left-12 right-12 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent"></div>
+                                                <div>
+                                                    <span className="font-mono text-cyan-400 text-[10px] font-bold tracking-widest block uppercase mb-4 mt-2">THE PIPELINE // INTERRUPT LOGIC</span>
+                                                    <h3 className="text-xl font-bold text-white font-display uppercase tracking-wider mb-6">Active Mitigation Pipeline</h3>
+                                                    <p className="text-xs text-slate-400 leading-relaxed mb-6 font-sans">
+                                                        SAFEWARE delivers a proactive three-layer defense matrix. First, pre-drive gatekeeping validates breath vapor and baseline ECG signals before releasing ignition relays. Second, real-time edge computer vision parses 68 facial landmarks to evaluate blink ratios (EAR) and head tilts. Third, autonomous emergency protocols decelerate the vehicle, lock steer targets, trigger flash hazards, and broadcast cellular SOS coordinates.
+                                                    </p>
+                                                </div>
+                                                <div className="border-t border-slate-900 pt-4 text-[10px] text-cyan-400/80 font-mono flex items-center gap-2">
+                                                    <span>⚡</span>
+                                                    <span>Mitigation: Preempting crashes before impact.</span>
+                                                </div>
+                                            </div>
+                                        </ScrollReveal>
+
+                                        {/* Section C: Engineering Challenges */}
+                                        <ScrollReveal>
+                                            <div className="backdrop-blur-2xl bg-slate-950/20 border border-white/5 p-8 rounded-[2rem] h-full flex flex-col justify-between hover:border-emerald-500/30 transition-all duration-500 group relative shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
+                                                <div className="absolute top-[1px] left-12 px-3 py-0.5 bg-slate-950 border-x border-b border-white/5 rounded-b-md text-[7px] font-mono text-emerald-400 tracking-widest uppercase">PHASE_03</div>
+                                                <div className="absolute top-0 left-12 right-12 h-[2px] bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent"></div>
+                                                <div>
+                                                    <span className="font-mono text-emerald-400 text-[10px] font-bold tracking-widest block uppercase mb-4 mt-2">HARDWARE // CAN-BUS SHIELD</span>
+                                                    <h3 className="text-xl font-bold text-white font-display uppercase tracking-wider mb-6">Overcoming Hardware Efficacy</h3>
+                                                    <p className="text-xs text-slate-400 leading-relaxed mb-6 font-sans">
+                                                        Fusing biometric sensors directly into standard vehicle controls (conductive grips and capacitive starter buttons) eliminates operator setup friction. Model processing lag was resolved by optimizing lightweight CNN networks (TensorFlow Lite/MediaPipe) to deliver real-time FPS on Raspberry Pi edge processors. Lastly, a secure secondary drive-by-wire gateway safely bridges AI deceleration signals directly onto the vehicle CAN-bus network.
+                                                    </p>
+                                                </div>
+                                                <div className="border-t border-slate-900 pt-4 text-[10px] text-emerald-400/80 font-mono flex items-center gap-2">
+                                                    <span>⚙️</span>
+                                                    <span>Resolution: TFLite edge networks & CAN-bus isolation.</span>
+                                                </div>
+                                            </div>
+                                        </ScrollReveal>
+                                    </div>
+
+                                    {/* Delhi AI Grand Summit Grand Finale Panel */}
+                                    <ScrollReveal>
+                                        <div className="backdrop-blur-2xl bg-slate-950/20 border border-white/10 p-8 sm:p-12 rounded-[2rem] relative overflow-hidden group hover:border-cyan-500/20 transition-all duration-500 shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
+                                            <div className="absolute top-[1px] left-12 px-3 py-0.5 bg-slate-950 border-x border-b border-white/5 rounded-b-md text-[7px] font-mono text-cyan-500 tracking-widest uppercase">VICTORY_DECREE</div>
+                                            <div className="absolute top-0 left-12 right-12 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/35 to-transparent"></div>
+                                            <div className="absolute -right-16 -bottom-16 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+                                            
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 relative z-10 mt-2">
+                                                <div className="space-y-4 max-w-2xl">
+                                                    <span className="px-3 py-1 rounded bg-emerald-950/65 text-cyber-emerald border border-emerald-900/40 font-mono text-[9px] font-bold tracking-widest uppercase inline-block">
+                                                        SUMMIT TRIUMPH: PRESTIGIOUS AWARD
+                                                    </span>
+                                                    <h3 className="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight uppercase">
+                                                        THE SUMMIT GENESIS: NATIONAL AI RECOGNITION
+                                                    </h3>
+                                                    <p className="text-slate-400 text-xs sm:text-sm font-sans leading-relaxed">
+                                                        At the prestigious **Delhi AI Grand Summit**, SAFEWARE was evaluated against the nation's most cutting-edge industrial solutions. Under rigorous review by Grand Summit evaluation committees and academic panels, the project was recognized for establishing a proactive safety paradigm, balancing biometric hardware with automated control logic.
+                                                    </p>
+                                                </div>
+                                                
+                                                <div className="flex flex-col justify-center items-center md:items-end text-center md:text-right border-t md:border-t-0 md:border-l border-slate-900 pt-6 md:pt-0 md:pl-8 min-w-[210px]">
+                                                    <span className="text-[10px] text-slate-500 font-mono font-bold tracking-widest uppercase">SUMMIT RANKING</span>
+                                                    <span className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400 font-mono my-2 block">
+                                                        TOP 150
+                                                    </span>
+                                                    <span className="text-[9.5px] text-slate-400 font-mono max-w-[190px] leading-relaxed">
+                                                        Out of 500,000+ Innovators Nationwide
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </ScrollReveal>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Tab 2: Checking Dashboard (Engineering Hub) */}
+                        {activeTab === 'dashboard' && (
+                            <div className={hubAura}>
+                                
+                                {/* Left Side - Camera HUD & Simulation Controls */}
+                                <div className="lg:col-span-6 xl:col-span-5 flex flex-col gap-6">
+                                    
+                                    {/* Glassmorphic Video Box (Rounded organic capsule) */}
+                                    <div className="relative backdrop-blur-2xl bg-slate-950/20 border border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[2rem] p-5 flex flex-col hover:border-cyan-500/30 transition-all duration-500">
+                                        <div className="absolute top-[1px] left-12 px-3 py-0.5 bg-slate-950 border-x border-b border-white/5 rounded-b-md text-[7px] font-mono text-cyan-500/80 tracking-widest uppercase">VISION_ENGINE</div>
+                                        <div className="absolute top-0 left-12 right-12 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent"></div>
+                                        
+                                        {/* Target brackets matching status color */}
+                                        <div className={`absolute top-4 left-4 w-4 h-4 border-t-2 border-l-2 ${hudBracketsColor} pointer-events-none transition-colors duration-300`}></div>
+                                        <div className={`absolute top-4 right-4 w-4 h-4 border-t-2 border-r-2 ${hudBracketsColor} pointer-events-none transition-colors duration-300`}></div>
+                                        <div className={`absolute bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 ${hudBracketsColor} pointer-events-none transition-colors duration-300`}></div>
+                                        <div className={`absolute bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 ${hudBracketsColor} pointer-events-none transition-colors duration-300`}></div>
+
+                                        <div className="flex items-center justify-between mb-3 border-b border-slate-900 pb-2 mt-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="h-2 w-2 rounded-full bg-cyan-500 animate-ping"></span>
+                                                <h3 className="text-xs font-bold text-slate-300 tracking-widest font-mono">AI COMP-VISION ATTENTION</h3>
+                                            </div>
+                                            <span className="text-[9px] bg-cyan-950/50 text-cyan-400 border border-cyan-800/40 px-2 py-0.5 rounded font-mono font-bold tracking-widest">CAM_ACTIVE</span>
+                                        </div>
+
+                                        {/* Video Feed Box - Overlaid with FaceMeshVisualizer */}
+                                        <div id="video-container" className="relative rounded-[1.5rem] overflow-hidden bg-black border border-slate-950 aspect-video flex items-center justify-center">
+                                            {/* Dynamic Reactive Human Avatar Mesh */}
+                                            <FaceMeshVisualizer driverState={telemetry.driver_state} bac={telemetry.bac} />
+                                            
+                                            {/* Scanning Laser Sweep matching status */}
+                                            <div className={`absolute inset-x-0 w-full laser-line animate-scanline-sweep pointer-events-none bg-gradient-to-r ${sweepLaserColor} z-20`}></div>
+
+                                            {/* Micro-Telemetry strings */}
+                                            <div className="absolute bottom-2 inset-x-3 flex justify-between text-[9px] font-mono text-cyan-400/85 bg-slate-950/85 border border-slate-800/80 p-1.5 rounded pointer-events-none z-20">
+                                                <span>SYS_CAM: ACTIVE</span>
+                                                <span>FPS: 30.00</span>
+                                                <span>MODEL: landmarks-68-mesh</span>
+                                            </div>
+                                        </div>
+                                        {/* Tooltip under widget */}
+                                        <span className="text-[8.5px] text-slate-500 font-mono mt-2 tracking-wider">Edge-AI landmark tracking EAR grid</span>
+                                    </div>
+
+                                    {/* Scenario Panel */}
+                                    <div className="backdrop-blur-2xl bg-slate-950/20 border border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[2rem] p-6 space-y-4 relative hover:border-cyan-500/30 transition-all duration-500">
+                                        <div className="absolute top-[1px] left-12 px-3 py-0.5 bg-slate-950 border-x border-b border-white/5 rounded-b-md text-[7px] font-mono text-cyan-500/80 tracking-widest uppercase">SIM_SIMULATION</div>
+                                        <div className="absolute top-0 left-12 right-12 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent"></div>
+
+                                        <h4 className="text-xs font-bold text-slate-300 tracking-widest font-mono uppercase mt-2">TACTICAL SIMULATOR</h4>
+                                        <p className="text-[10px] text-slate-500 font-sans leading-relaxed">Override telemetry parameters to verify visual screens, dashboard triggers, and chimes.</p>
+                                        
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {/* Nominal */}
+                                            <button 
+                                                onClick={() => triggerStateChange('Active', false)} 
+                                                className={`p-3 border rounded-xl text-left transition-all duration-350 hover:border-cyan-500/50 hover:shadow-[0_0_12px_rgba(6,182,212,0.1)] relative group ${telemetry.driver_state === 'Active' && telemetry.bac < 0.08 ? 'bg-slate-900 border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.12)]' : 'bg-slate-950/80 border-slate-850'}`}
+                                            >
+                                                <span className="block text-xs font-bold text-white font-mono flex items-center gap-1.5">
+                                                    <span className={`h-1.5 w-1.5 rounded-full ${telemetry.driver_state === 'Active' && telemetry.bac < 0.08 ? 'bg-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.9)]' : 'bg-slate-600'}`}></span>
+                                                    NOMINAL DRIVE
+                                                </span>
+                                                <span className="text-[9px] text-slate-500 block mt-1 font-sans">Active attention & normal vitals.</span>
+                                            </button>
+
+                                            {/* Drowsy */}
+                                            <button 
+                                                onClick={() => triggerStateChange('Drowsy', false)} 
+                                                className={`p-3 border rounded-xl text-left transition-all duration-350 hover:border-amber-500/50 hover:shadow-[0_0_12px_rgba(245,158,11,0.1)] relative group ${telemetry.driver_state === 'Drowsy' ? 'bg-slate-900 border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.12)]' : 'bg-slate-950/80 border-slate-850'}`}
+                                            >
+                                                <span className="block text-xs font-bold text-white font-mono flex items-center gap-1.5">
+                                                    <span className={`h-1.5 w-1.5 rounded-full ${telemetry.driver_state === 'Drowsy' ? 'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.9)] animate-pulse' : 'bg-slate-600'}`}></span>
+                                                    FATIGUE MODE
+                                                </span>
+                                                <span className="text-[9px] text-slate-500 block mt-1 font-sans">Heavy blink EAR & yawn frequency.</span>
+                                            </button>
+
+                                            {/* Emergency */}
+                                            <button 
+                                                onClick={() => triggerStateChange('Medical Emergency', false)} 
+                                                className={`p-3 border rounded-xl text-left transition-all duration-350 hover:border-red-500/50 hover:shadow-[0_0_12px_rgba(239,68,68,0.1)] relative group ${telemetry.driver_state === 'Medical Emergency' ? 'bg-slate-900 border-red-500/60 shadow-[0_0_12px_rgba(239,68,68,0.12)]' : 'bg-slate-950/80 border-slate-850'}`}
+                                            >
+                                                <span className="block text-xs font-bold text-white font-mono flex items-center gap-1.5">
+                                                    <span className={`h-1.5 w-1.5 rounded-full ${telemetry.driver_state === 'Medical Emergency' ? 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.9)] animate-pulse' : 'bg-slate-600'}`}></span>
+                                                    MEDICAL ALERT
+                                                </span>
+                                                <span className="text-[9px] text-slate-500 block mt-1 font-sans">Vitals collapse & auto-ignition block.</span>
+                                            </button>
+
+                                            {/* Alcohol */}
+                                            <button 
+                                                onClick={() => triggerStateChange('Active', true)} 
+                                                className={`p-3 border rounded-xl text-left transition-all duration-350 hover:border-indigo-500/50 hover:shadow-[0_0_12px_rgba(99,102,241,0.1)] relative group ${telemetry.bac >= 0.08 ? 'bg-slate-900 border-indigo-500/60 shadow-[0_0_12px_rgba(99,102,241,0.12)]' : 'bg-slate-950/80 border-slate-850'}`}
+                                            >
+                                                <span className="block text-xs font-bold text-white font-mono flex items-center gap-1.5">
+                                                    <span className={`h-1.5 w-1.5 rounded-full ${telemetry.bac >= 0.08 ? 'bg-indigo-500 shadow-[0_0_6px_rgba(99,102,241,0.9)] animate-pulse' : 'bg-slate-600'}`}></span>
+                                                    ALCOHOL POSITIVE
+                                                </span>
+                                                <span className="text-[9px] text-slate-500 block mt-1 font-sans">MQ-3 gas index over permitted 0.08%.</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right Side - Telemetry Gauges, Switch & ECG */}
+                                <div className="lg:col-span-6 xl:col-span-7 flex flex-col gap-6 font-mono">
+                                    
+                                    {/* Top Status Indicators */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        
+                                        {/* Engine Ignition Switch Card */}
+                                        <div id="status-ignition-card" className={`backdrop-blur-2xl bg-slate-950/20 border shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[2rem] p-5 flex items-center justify-between transition-all duration-300 relative overflow-hidden ${telemetry.ignition_enabled ? 'border-emerald-500/35 hover:shadow-[0_0_20px_rgba(16,185,129,0.12)]' : 'border-red-500/50 hover:shadow-[0_0_25px_rgba(239,68,68,0.22)] animate-pulse'}`}>
+                                            <div className={`absolute inset-0 pointer-events-none transition-all duration-500 ${telemetry.ignition_enabled ? 'bg-emerald-500/5' : 'bg-red-500/5'} animate-pulse`}></div>
+                                            <div className="relative z-10">
+                                                <span className="text-[9px] text-slate-550 tracking-widest block font-bold font-mono uppercase">IGNITION RELAY</span>
+                                                <span className={`text-xl font-extrabold font-mono tracking-wider ${telemetry.ignition_enabled ? 'text-emerald-400' : 'text-red-500 animate-pulse'}`}>
+                                                    {telemetry.ignition_enabled ? 'ENABLED' : 'LOCKED'}
+                                                </span>
+                                            </div>
+                                            <div className="relative z-10 flex items-center">
+                                                {/* Mechanical switch */}
+                                                <div className="h-8 w-14 bg-slate-900 border border-slate-800 rounded-full flex items-center p-1 cursor-not-allowed">
+                                                    <div className={`h-6 w-6 rounded-full transition-all duration-300 ${telemetry.ignition_enabled ? 'bg-emerald-500 translate-x-6 shadow-[0_0_12px_rgba(16,185,129,0.85)]' : 'bg-red-600 translate-x-0 shadow-[0_0_12px_rgba(239,68,68,0.85)]'}`}></div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* System state status card */}
+                                        <div id="status-driver-card" className={`backdrop-blur-2xl bg-slate-950/20 border shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[2rem] p-5 flex items-center justify-between transition-all duration-300 relative ${telemetry.driver_state === 'Active' ? 'border-slate-800/80' : (telemetry.driver_state === 'Drowsy' ? 'border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.22)]')}`}>
+                                            <div>
+                                                <span className="text-[9px] text-slate-550 tracking-widest block font-bold font-mono uppercase">SYSTEM READOUT</span>
+                                                <span className={`text-xl font-extrabold font-mono tracking-wider ${telemetry.driver_state === 'Active' ? 'text-cyan-400' : (telemetry.driver_state === 'Drowsy' ? 'text-amber-500 animate-pulse' : 'text-red-500 animate-pulse')}`}>
+                                                    {telemetry.driver_state.toUpperCase()}
+                                                </span>
+                                            </div>
+                                            <span className={`px-3 py-1 text-[9px] font-extrabold rounded font-mono tracking-widest ${telemetry.driver_state === 'Active' ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-900/40' : (telemetry.driver_state === 'Drowsy' ? 'bg-amber-950/60 text-amber-500 border border-amber-900/40' : 'bg-red-950/60 text-red-500 border border-red-900/40')}`}>
+                                                {telemetry.driver_state === 'Active' ? 'NOMINAL' : (telemetry.driver_state === 'Drowsy' ? 'DROWSY' : 'EMERGENCY')}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Biometrics telemetry cards */}
+                                    <div className="grid sm:grid-cols-3 gap-4">
+                                        
+                                        {/* Heart Rate Vitals Card - Synchronized flashing border/glow */}
+                                        <div 
+                                            id="card-hr" 
+                                            className="backdrop-blur-2xl bg-slate-950/20 border rounded-[2rem] p-5 flex flex-col items-center text-center justify-between relative overflow-hidden transition-all duration-300 card-flash-active"
+                                            style={hrCardStyle}
+                                        >
+                                            <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-red-500 to-indigo-500"></div>
+                                            
+                                            {/* Synced Heart Icon */}
+                                            <span className="text-[9px] text-slate-550 tracking-widest font-mono font-bold uppercase flex items-center gap-1.5">
+                                                CARDIAC PULSE
+                                                <span 
+                                                    className="text-red-500 heart-beat-active" 
+                                                    style={heartIconStyle}
+                                                >
+                                                    ♥
+                                                </span>
+                                            </span>
+                                            
+                                            <div className="my-3 flex items-baseline gap-1">
+                                                <span className="text-4xl font-extrabold text-white font-mono"><AnimatedCounter value={telemetry.heart_rate} /></span>
+                                                <span className="text-[9px] text-slate-555 font-bold font-mono">BPM</span>
+                                            </div>
+                                            
+                                            <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold tracking-wider ${telemetry.heart_rate > 100 || telemetry.heart_rate < 50 ? 'bg-red-950/40 text-red-400 border border-red-900/40 animate-pulse' : 'bg-cyan-950/40 text-cyber-cyan border border-cyan-900/40'}`}>
+                                                {telemetry.heart_rate > 100 ? 'TACHYCARDIA' : (telemetry.heart_rate < 50 ? 'BRADYCARDIA' : 'NOMINAL')}
+                                            </span>
+                                            <span className="text-[8px] text-slate-600 mt-2 font-mono tracking-wider">Continuous galvanic sinus sweep</span>
+                                        </div>
+
+                                        {/* Blood pressure */}
+                                        <div className={`backdrop-blur-2xl bg-slate-950/20 border rounded-[2rem] p-5 flex flex-col items-center text-center justify-between relative overflow-hidden transition-all duration-300 ${telemetry.driver_state === 'Active' ? 'border-white/10 hover:border-cyan-500/40 hover:shadow-[0_0_20px_rgba(6,182,212,0.1)]' : (telemetry.driver_state === 'Drowsy' ? 'border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.155)]' : 'border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.155)]')}`}>
+                                            <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-cyan-500 to-emerald-500"></div>
+                                            <span className="text-[9px] text-slate-550 tracking-widest font-mono font-bold uppercase">ARTERIAL PRESSURE</span>
+                                            
+                                            <div className="my-3 flex items-baseline gap-1">
+                                                <span className="text-3xl font-extrabold text-white font-mono">{telemetry.blood_pressure_sys}/{telemetry.blood_pressure_dia}</span>
+                                                <span className="text-[8px] text-slate-555 font-bold font-mono">mmHg</span>
+                                            </div>
+
+                                            <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold tracking-wider ${telemetry.blood_pressure_sys < 95 ? 'bg-amber-950/40 text-amber-500 border border-amber-900/40' : 'bg-emerald-950/30 text-emerald-400 border border-emerald-900/30'}`}>
+                                                {telemetry.blood_pressure_sys < 95 ? 'HYPOTENSIVE' : 'OPTIMAL'}
+                                            </span>
+                                            <span className="text-[8px] text-slate-600 mt-2 font-mono tracking-wider">Real-time hemodynamic pulse estimation</span>
+                                        </div>
+
+                                        {/* Alcohol index MQ-3 */}
+                                        <div className={`backdrop-blur-2xl bg-slate-950/20 border rounded-[2rem] p-5 flex flex-col items-center text-center justify-between relative overflow-hidden transition-all duration-300 ${telemetry.bac >= 0.08 ? 'border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.15)]' : 'border-white/10 hover:border-amber-500/40 hover:shadow-[0_0_20px_rgba(245,158,11,0.1)]'}`}>
+                                            <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-amber-500 to-yellow-500"></div>
+                                            <span className="text-[9px] text-slate-550 tracking-widest font-mono font-bold uppercase">ALCOHOL (BAC)</span>
+                                            
+                                            <div className="my-3 flex items-baseline gap-1">
+                                                <span className="text-4xl font-extrabold text-white font-mono"><AnimatedCounter value={telemetry.bac} /></span>
+                                                <span className="text-[9px] text-slate-555 font-bold font-mono">%</span>
+                                            </div>
+
+                                            <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold tracking-wider ${telemetry.bac >= 0.08 ? 'bg-red-950/40 text-red-400 border border-red-900/40 animate-pulse' : 'bg-emerald-950/30 text-emerald-400 border border-emerald-900/30'}`}>
+                                                {telemetry.bac >= 0.08 ? 'OVER LIMIT' : 'CLEAN'}
+                                            </span>
+                                            <span className="text-[8px] text-slate-600 mt-2 font-mono tracking-wider">Automated pre-drive vapor analysis</span>
+                                        </div>
+                                    </div>
+
+                                    {/* ECG Component */}
+                                    <EcgVisualizer bpm={telemetry.heart_rate} driverState={telemetry.driver_state} bac={telemetry.bac} />
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Rolling Live system Console Output (Always rendered at bottom) */}
+                        <ConsoleLogStream driverState={telemetry.driver_state} bac={telemetry.bac} />
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="border-t border-slate-900/60 py-6 text-center text-xs text-slate-650 font-mono">
+                        SAFEWARE ENTERPRISE CONTROL HUB v2.5 — SECURITY PROTOCOLS ENFORCED.
+                    </footer>
+                </div>
+            );
+        };
+
+        // Render React DOM App
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
