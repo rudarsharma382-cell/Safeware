@@ -5,7 +5,7 @@ import random
 import threading
 import cv2
 import numpy as np
-from flask import Flask, Response, jsonify, request, render_template
+from flask import Flask, Response, jsonify, request, render_template, send_from_directory
 
 app = Flask(__name__, template_folder='templates')
 
@@ -208,6 +208,14 @@ def generate_camera_frames():
 
 
 # --- Flask Routing ---
+@app.route('/favicon.ico')
+def favicon():
+    return app.send_static_file('favicon.png')
+
+@app.route('/interstellar.mp3')
+def serve_interstellar():
+    return send_from_directory('public', 'interstellar.mp3')
+
 @app.route('/')
 def index():
     return render_template('index.html')
