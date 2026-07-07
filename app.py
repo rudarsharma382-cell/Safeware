@@ -212,9 +212,6 @@ def generate_camera_frames():
 def favicon():
     return app.send_static_file('favicon.png')
 
-@app.route('/interstellar.mp3')
-def serve_interstellar():
-    return send_from_directory('public', 'interstellar.mp3')
 
 @app.route('/')
 def index():
@@ -270,6 +267,16 @@ def set_state():
             sim_state["bac"] = 0.00
             
     return jsonify({"success": True, "state": sim_state})
+
+from flask import send_from_directory
+import os
+
+@app.route('/interstellar.mp3')
+def serve_audio():
+    for folder in ['public', 'static', '.']:
+        if os.path.exists(os.path.join(app.root_path, folder, 'interstellar.mp3')):
+            return send_from_directory(os.path.join(app.root_path, folder), 'interstellar.mp3')
+    return "Audio asset missing", 404
 
 if __name__ == '__main__':
     # Listen on all interfaces on port 5000
