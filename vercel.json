@@ -11,8 +11,8 @@
       "dest": "/static/$1"
     },
     {
-      "src": "/interstellar.mp3",
-      "dest": "/public/interstellar.mp3"
+      "src": "/public/(.*)",
+      "dest": "/public/$1"
     },
     {
       "src": "/(.*)",

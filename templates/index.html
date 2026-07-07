@@ -941,27 +941,10 @@
             });
             const [hoveredNode, setHoveredNode] = useState('safometer');
             const audioCtxRef = useRef(null);
-            const audioRef = useRef(null);
 
             useEffect(() => {
-                audioRef.current = new Audio("https://archive.org/download/interstellar-soundtrack/01.%20Dreaming%20Of%20The%20Crash.mp3");
-                audioRef.current.loop = true;
-                audioRef.current.volume = 0.55; // Calibrated cinematic ambient balance
-                return () => {
-                    if (audioRef.current) {
-                        audioRef.current.pause();
-                    }
-                };
-            }, []);
-
-            const toggleSystemAudio = () => {
-                if (isAudioPlaying) {
-                    audioRef.current.pause();
-                } else {
-                    audioRef.current.play().catch(err => console.log("Audio play blocked:", err));
-                }
-                setIsAudioPlaying(!isAudioPlaying);
-            };
+                window.setIsAudioPlaying = setIsAudioPlaying;
+            }, [setIsAudioPlaying]);
 
             // Scroll position tracking for Parallax scaling
             const [scrollY, setScrollY] = useState(0);
@@ -1898,8 +1881,9 @@
 
                     {/* Translucent HUD Audio Icon Module */}
                     <button 
-                        onClick={toggleSystemAudio}
-                        className="fixed bottom-6 right-8 z-50 backdrop-blur-md bg-slate-950/40 border border-white/10 hover:border-[#00F0FF]/40 rounded-full w-12 h-12 flex items-center justify-center transition-all duration-300 shadow-[0_0_20px_rgba(0,0,0,0.5)] cursor-none select-none"
+                        id="audio-toggle-btn"
+                        className="fixed bottom-6 right-8 z-50 backdrop-blur-md bg-slate-950/40 border border-white/10 hover:border-[#00F0FF]/40 rounded-full w-12 h-12 flex items-center justify-center transition-all duration-300 shadow-[0_0_20px_rgba(0,0,0,0.5)] cursor-pointer select-none"
+                        title="Toggle Soundtrack"
                     >
                         {isAudioPlaying && (
                             <span className="absolute inset-0 rounded-full border border-[#00F0FF]/30 animate-ping pointer-events-none"></span>
@@ -1936,6 +1920,65 @@
         // Render React DOM App
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
+
+        // Self-initializing DOM Event Listener audio toggle framework (dual-environment)
+        const initAudio = () => {
+            const audioBtn = document.getElementById('audio-toggle-btn');
+            let audioTrack = null;
+            let isPlayingStatus = false;
+
+            const bindEvent = (btn) => {
+                if (!btn || btn.dataset.bound) return;
+                btn.dataset.bound = "true";
+                btn.addEventListener('click', () => {
+                    if (!audioTrack) {
+                        // Detects current execution domain context
+                        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+                        // Maps cleanly to the public asset folder layout natively across both systems
+                        const audioSourcePath = isLocalhost ? '/public/interstellar.mp3' : '/public/interstellar.mp3';
+
+                        audioTrack = new Audio(audioSourcePath);
+                        audioTrack.loop = true;
+                    }
+
+                    if (isPlayingStatus) {
+                        audioTrack.pause();
+                        isPlayingStatus = false;
+                        btn.style.borderColor = "rgba(255, 255, 255, 0.1)";
+                        btn.style.boxShadow = "none";
+                        if (window.setIsAudioPlaying) window.setIsAudioPlaying(false);
+                    } else {
+                        audioTrack.play()
+                            .then(() => {
+                                isPlayingStatus = true;
+                                btn.style.borderColor = "#00F0FF";
+                                btn.style.boxShadow = "0 0 15px rgba(0, 240, 255, 0.4)";
+                                if (window.setIsAudioPlaying) window.setIsAudioPlaying(true);
+                            })
+                            .catch((error) => {
+                                console.error("Audio trigger intercepted by browser security settings:", error);
+                            });
+                    }
+                });
+            };
+
+            if (audioBtn) {
+                bindEvent(audioBtn);
+            }
+
+            const observer = new MutationObserver(() => {
+                const btn = document.getElementById('audio-toggle-btn');
+                if (btn) bindEvent(btn);
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initAudio);
+        } else {
+            initAudio();
+        }
     </script>
 </body>
 </html>
