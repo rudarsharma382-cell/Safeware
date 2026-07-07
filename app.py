@@ -278,6 +278,10 @@ def serve_audio():
             return send_from_directory(os.path.join(app.root_path, folder), 'interstellar.mp3')
     return "Audio asset missing", 404
 
+@app.route('/public/<path:filename>')
+def serve_public(filename):
+    return send_from_directory(os.path.join(app.root_path, 'public'), filename)
+
 if __name__ == '__main__':
     # Listen on all interfaces on port 5000
     app.run(host='0.0.0.0', port=5000, debug=True)

@@ -7,6 +7,14 @@
   ],
   "routes": [
     {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/interstellar.mp3",
+      "dest": "/public/interstellar.mp3"
+    },
+    {
       "src": "/(.*)",
       "dest": "app.py"
     }
