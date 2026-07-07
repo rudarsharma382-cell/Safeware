@@ -1,5 +1,8 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/((?!static|public|templates|favicon.ico).*)",
+      "destination": "/templates/index.html"
+    }
   ]
 }
