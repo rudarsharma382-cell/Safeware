@@ -149,6 +149,9 @@
     </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-[#00FFCC] selection:text-black">
+{% endraw %}
+    <audio id="bgMusic" src="{{ url_for('static', filename='audio/interstellar.mp3') }}" loop></audio>
+{% raw %}
 
     <!-- React Mounting Target -->
     <div id="root" class="relative z-10"></div>
@@ -1932,14 +1935,7 @@
                 btn.dataset.bound = "true";
                 btn.addEventListener('click', () => {
                     if (!audioTrack) {
-                        // Detects current execution domain context
-                        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-                        // Maps cleanly to the public asset folder layout natively across both systems
-                        const audioSourcePath = isLocalhost ? '/public/interstellar.mp3' : '/public/interstellar.mp3';
-
-                        audioTrack = new Audio(audioSourcePath);
-                        audioTrack.loop = true;
+                        audioTrack = document.getElementById('bgMusic');
                     }
 
                     if (isPlayingStatus) {
