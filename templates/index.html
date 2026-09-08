@@ -428,6 +428,137 @@
             );
         };
 
+        // Custom Component: Direct Browser HTML5 WebRTC Live Webcam Feed with HUD Overlays
+        const BrowserWebcamFeed = ({ driverState }) => {
+            const videoRef = useRef(null);
+            const canvasRef = useRef(null);
+            const [status, setStatus] = useState('initializing');
+            const [errorMessage, setErrorMessage] = useState('');
+
+            useEffect(() => {
+                let localStream = null;
+                let animId = null;
+
+                async function startCam() {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({
+                            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
+                        });
+                        localStream = stream;
+                        if (videoRef.current) {
+                            videoRef.current.srcObject = stream;
+                            videoRef.current.play();
+                            setStatus('active');
+                        }
+                    } catch (err) {
+                        console.error("Camera access error:", err);
+                        setStatus('denied');
+                        setErrorMessage(err.message || "Camera access denied by browser or blocked by hardware shutter switch.");
+                    }
+                }
+
+                startCam();
+
+                const drawHUD = () => {
+                    const video = videoRef.current;
+                    const canvas = canvasRef.current;
+                    if (video && canvas && video.readyState === 4) {
+                        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                            canvas.width = video.videoWidth || 640;
+                            canvas.height = video.videoHeight || 480;
+                        }
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                        const w = canvas.width;
+                        const h = canvas.height;
+
+                        const fx = w * 0.25;
+                        const fy = h * 0.20;
+                        const fw = w * 0.50;
+                        const fh = h * 0.60;
+
+                        const hudColor = driverState === 'Active' ? '#00FFCC' : (driverState === 'Drowsy' ? '#f59e0b' : '#ef4444');
+
+                        ctx.strokeStyle = hudColor;
+                        ctx.lineWidth = 3;
+                        const l = 25;
+                        ctx.beginPath(); ctx.moveTo(fx, fy + l); ctx.lineTo(fx, fy); ctx.lineTo(fx + l, fy); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(fx + fw - l, fy); ctx.lineTo(fx + fw, fy); ctx.lineTo(fx + fw, fy + l); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(fx, fy + fh - l); ctx.lineTo(fx, fy + fh); ctx.lineTo(fx + l, fy + fh); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(fx + fw - l, fy + fh); ctx.lineTo(fx + fw, fy + fh); ctx.lineTo(fx + fw, fy + fh - l); ctx.stroke();
+
+                        const leftEye = { x: fx + fw * 0.33, y: fy + fh * 0.35 };
+                        const rightEye = { x: fx + fw * 0.67, y: fy + fh * 0.35 };
+
+                        ctx.strokeStyle = "#00FFCC";
+                        ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.arc(leftEye.x, leftEye.y, 16, 0, Math.PI * 2); ctx.stroke();
+                        ctx.beginPath(); ctx.arc(rightEye.x, rightEye.y, 16, 0, Math.PI * 2); ctx.stroke();
+
+                        ctx.lineWidth = 1;
+                        ctx.beginPath(); ctx.moveTo(leftEye.x - 20, leftEye.y); ctx.lineTo(leftEye.x + 20, leftEye.y); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(leftEye.x, leftEye.y - 20); ctx.lineTo(leftEye.x, leftEye.y + 20); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(rightEye.x - 20, rightEye.y); ctx.lineTo(rightEye.x + 20, rightEye.y); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(rightEye.x, rightEye.y - 20); ctx.lineTo(rightEye.x, rightEye.y + 20); ctx.stroke();
+                    }
+                    animId = requestAnimationFrame(drawHUD);
+                };
+
+                drawHUD();
+
+                return () => {
+                    if (localStream) {
+                        localStream.getTracks().forEach(track => track.stop());
+                    }
+                    if (animId) cancelAnimationFrame(animId);
+                };
+            }, [driverState]);
+
+            return (
+                <div className="w-full h-full relative flex items-center justify-center bg-black rounded-[1.5rem] overflow-hidden border border-slate-950 aspect-video">
+                    {status === 'active' && (
+                        <React.Fragment>
+                            <video 
+                                ref={videoRef} 
+                                autoPlay 
+                                playsInline 
+                                muted 
+                                className="w-full h-full object-cover transform -scale-x-100" 
+                            />
+                            <canvas 
+                                ref={canvasRef} 
+                                className="absolute inset-0 w-full h-full pointer-events-none transform -scale-x-100 z-10" 
+                            />
+                        </React.Fragment>
+                    )}
+
+                    {status === 'denied' && (
+                        <div className="p-6 text-center space-y-4">
+                            <div className="text-amber-400 font-mono text-xs font-bold uppercase tracking-wider">
+                                ⚠️ BROWSER WEBCAM ACCESS DENIED OR HARDWARE SHUTTER CLOSED
+                            </div>
+                            <p className="text-slate-400 text-xs font-sans max-w-sm mx-auto">
+                                Click "Allow" on your browser's camera prompt or ensure your physical laptop webcam shutter is open.
+                            </p>
+                            <button 
+                                onClick={() => window.location.reload()} 
+                                className="px-4 py-2 bg-[#00FFCC] text-black font-mono font-bold text-xs rounded-xl shadow"
+                            >
+                                Re-Request Camera Access
+                            </button>
+                        </div>
+                    )}
+
+                    {status === 'initializing' && (
+                        <div className="text-cyan-400 font-mono text-xs font-bold animate-pulse">
+                            [REQUESTING CAMERA PERMISSION...]
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
         // Custom Component: Highly Sophisticated Minimalist Sci-Fi Biometric Human Profile
         const FaceMeshVisualizer = ({ driverState, bac }) => {
             const [time, setTime] = useState(0);
@@ -934,7 +1065,7 @@
         // Main App Component
         const App = () => {
             const [activeTab, setActiveTab] = useState('presentation');
-            const [visionMode, setVisionMode] = useState('asset'); 
+            const [visionMode, setVisionMode] = useState('webcam'); 
             const [isAudioPlaying, setIsAudioPlaying] = useState(false);
             const [telemetry, setTelemetry] = useState({
                 ignition_enabled: true,
@@ -1628,16 +1759,22 @@
                                             </div>
                                             <div className="flex bg-slate-900/80 border border-slate-800 p-0.5 rounded-lg">
                                                 <button 
-                                                    onClick={() => setVisionMode('mesh')}
-                                                    className={`px-2 py-1 text-[8px] font-mono font-bold tracking-wider rounded-md transition-all ${visionMode === 'mesh' ? 'bg-[#00FFCC] text-black shadow font-bold' : 'text-slate-400 hover:text-white'}`}
+                                                    onClick={() => setVisionMode('webcam')}
+                                                    className={`px-2 py-1 text-[8px] font-mono font-bold tracking-wider rounded-md transition-all ${visionMode === 'webcam' ? 'bg-[#00FFCC] text-black shadow font-bold' : 'text-slate-400 hover:text-white'}`}
                                                 >
-                                                    VECTOR
+                                                    LIVE WEBCAM
                                                 </button>
                                                 <button 
                                                     onClick={() => setVisionMode('camera')}
                                                     className={`px-2 py-1 text-[8px] font-mono font-bold tracking-wider rounded-md transition-all ${visionMode === 'camera' ? 'bg-[#00FFCC] text-black shadow font-bold' : 'text-slate-400 hover:text-white'}`}
                                                 >
-                                                    CAMERA
+                                                    PYTHON CV
+                                                </button>
+                                                <button 
+                                                    onClick={() => setVisionMode('mesh')}
+                                                    className={`px-2 py-1 text-[8px] font-mono font-bold tracking-wider rounded-md transition-all ${visionMode === 'mesh' ? 'bg-[#00FFCC] text-black shadow font-bold' : 'text-slate-400 hover:text-white'}`}
+                                                >
+                                                    VECTOR
                                                 </button>
                                                 <button 
                                                     onClick={() => setVisionMode('asset')}
@@ -1648,8 +1785,11 @@
                                             </div>
                                         </div>
 
-                                        {/* Video Feed Box - Overlaid with FaceMeshVisualizer */}
+                                        {/* Video Feed Box - Overlaid with FaceMeshVisualizer & BrowserWebcamFeed */}
                                         <div id="video-container" className="relative rounded-[1.5rem] overflow-hidden bg-black border border-slate-950 aspect-video flex items-center justify-center">
+                                            {visionMode === 'webcam' && (
+                                                <BrowserWebcamFeed driverState={telemetry.driver_state} />
+                                            )}
                                             {visionMode === 'mesh' && (
                                                 <FaceMeshVisualizer driverState={telemetry.driver_state} bac={telemetry.bac} />
                                             )}
@@ -1658,10 +1798,6 @@
                                                     src="/video_feed" 
                                                     className="w-full h-full object-cover transition-opacity duration-500" 
                                                     alt="Live AI Camera Feed" 
-                                                    onError={(e) => {
-                                                        e.target.onerror = null;
-                                                        setVisionMode('mesh');
-                                                    }}
                                                 />
                                             )}
                                             {visionMode === 'asset' && (
