@@ -435,34 +435,45 @@
             const [status, setStatus] = useState('initializing');
             const [errorMessage, setErrorMessage] = useState('');
 
-            useEffect(() => {
-                let localStream = null;
-                let animId = null;
-
-                async function startCam() {
+            const startCam = useCallback(async () => {
+                setStatus('initializing');
+                setErrorMessage('');
+                try {
+                    let stream = null;
                     try {
-                        const stream = await navigator.mediaDevices.getUserMedia({
-                            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
-                        });
-                        localStream = stream;
-                        if (videoRef.current) {
-                            videoRef.current.srcObject = stream;
-                            videoRef.current.play();
-                            setStatus('active');
-                        }
-                    } catch (err) {
-                        console.error("Camera access error:", err);
-                        setStatus('denied');
-                        setErrorMessage(err.message || "Camera access denied by browser or blocked by hardware shutter switch.");
+                        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    } catch (e1) {
+                        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
                     }
-                }
 
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                        videoRef.current.onloadedmetadata = () => {
+                            videoRef.current.play().then(() => {
+                                setStatus('active');
+                            }).catch(pErr => {
+                                console.warn("Video play warning:", pErr);
+                                setStatus('active');
+                            });
+                        };
+                    } else {
+                        setStatus('active');
+                    }
+                } catch (err) {
+                    console.error("Camera access error:", err);
+                    setStatus('denied');
+                    setErrorMessage(err.message || "Browser blocked camera access or camera is in use by another app.");
+                }
+            }, []);
+
+            useEffect(() => {
                 startCam();
+                let animId = null;
 
                 const drawHUD = () => {
                     const video = videoRef.current;
                     const canvas = canvasRef.current;
-                    if (video && canvas && video.readyState === 4) {
+                    if (video && canvas && video.readyState >= 2) {
                         if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
                             canvas.width = video.videoWidth || 640;
                             canvas.height = video.videoHeight || 480;
@@ -508,50 +519,47 @@
                 drawHUD();
 
                 return () => {
-                    if (localStream) {
-                        localStream.getTracks().forEach(track => track.stop());
+                    if (videoRef.current && videoRef.current.srcObject) {
+                        const tracks = videoRef.current.srcObject.getTracks();
+                        tracks.forEach(track => track.stop());
                     }
                     if (animId) cancelAnimationFrame(animId);
                 };
-            }, [driverState]);
+            }, [driverState, startCam]);
 
             return (
                 <div className="w-full h-full relative flex items-center justify-center bg-black rounded-[1.5rem] overflow-hidden border border-slate-950 aspect-video">
-                    {status === 'active' && (
-                        <React.Fragment>
-                            <video 
-                                ref={videoRef} 
-                                autoPlay 
-                                playsInline 
-                                muted 
-                                className="w-full h-full object-cover transform -scale-x-100" 
-                            />
-                            <canvas 
-                                ref={canvasRef} 
-                                className="absolute inset-0 w-full h-full pointer-events-none transform -scale-x-100 z-10" 
-                            />
-                        </React.Fragment>
-                    )}
+                    <video 
+                        ref={videoRef} 
+                        autoPlay 
+                        playsInline 
+                        muted 
+                        className={`w-full h-full object-cover transform -scale-x-100 ${status === 'active' ? 'block' : 'hidden'}`} 
+                    />
+                    <canvas 
+                        ref={canvasRef} 
+                        className={`absolute inset-0 w-full h-full pointer-events-none transform -scale-x-100 z-10 ${status === 'active' ? 'block' : 'hidden'}`} 
+                    />
 
                     {status === 'denied' && (
-                        <div className="p-6 text-center space-y-4">
+                        <div className="p-6 text-center space-y-4 z-20">
                             <div className="text-amber-400 font-mono text-xs font-bold uppercase tracking-wider">
-                                ⚠️ BROWSER WEBCAM ACCESS DENIED OR HARDWARE SHUTTER CLOSED
+                                ⚠️ CAMERA ACCESS BLOCKED OR OCCUPIED
                             </div>
                             <p className="text-slate-400 text-xs font-sans max-w-sm mx-auto">
-                                Click "Allow" on your browser's camera prompt or ensure your physical laptop webcam shutter is open.
+                                {errorMessage || "Please allow camera access in your browser location bar icon."}
                             </p>
                             <button 
-                                onClick={() => window.location.reload()} 
-                                className="px-4 py-2 bg-[#00FFCC] text-black font-mono font-bold text-xs rounded-xl shadow"
+                                onClick={startCam} 
+                                className="px-4 py-2 bg-[#00FFCC] hover:bg-[#00FFCC]/80 text-black font-mono font-bold text-xs rounded-xl shadow cursor-pointer transition-all"
                             >
-                                Re-Request Camera Access
+                                Re-Request Camera Access 🎥
                             </button>
                         </div>
                     )}
 
                     {status === 'initializing' && (
-                        <div className="text-cyan-400 font-mono text-xs font-bold animate-pulse">
+                        <div className="text-cyan-400 font-mono text-xs font-bold animate-pulse z-20">
                             [REQUESTING CAMERA PERMISSION...]
                         </div>
                     )}
