@@ -160,7 +160,7 @@
 
     <!-- React Script Block -->
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useCallback } = React;
 
         // Framer Motion UMD Global Helper with resilient fallbacks
         const Motion = (window.Motion || window.framerMotion || {}).motion || {
@@ -1073,7 +1073,7 @@
         // Main App Component
         const App = () => {
             const [activeTab, setActiveTab] = useState('presentation');
-            const [visionMode, setVisionMode] = useState('webcam'); 
+            const [visionMode, setVisionMode] = useState('mesh'); 
             const [isAudioPlaying, setIsAudioPlaying] = useState(false);
             const [telemetry, setTelemetry] = useState({
                 ignition_enabled: true,
