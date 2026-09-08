@@ -56,116 +56,141 @@ def update_telemetry_loop():
 thread = threading.Thread(target=update_telemetry_loop, daemon=True)
 thread.start()
 
-# --- Simulated Video Stream Frame Generator ---
+# --- Real OpenCV Camera Stream Frame Generator ---
 def generate_camera_frames():
-    """Generates JPEG frames representing OpenCV facial detection feedback."""
+    """Generates JPEG frames by reading real camera input and performing OpenCV facial detection."""
+    face_cascade = None
+    eye_cascade = None
+    try:
+        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        eye_path = cv2.data.haarcascades + 'haarcascade_eye.xml'
+        if os.path.exists(cascade_path):
+            face_cascade = cv2.CascadeClassifier(cascade_path)
+        if os.path.exists(eye_path):
+            eye_cascade = cv2.CascadeClassifier(eye_path)
+    except Exception as e:
+        print("OpenCV Cascade init error:", e)
+
+    cap = None
+    try:
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(0)
+    except Exception as e:
+        print("Camera open exception in Python:", e)
+
     frame_width = 640
     frame_height = 480
     frame_count = 0
-    
-    while True:
-        frame = np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
-        
-        for i in range(0, frame_width, 40):
-            cv2.line(frame, (i, 0), (i, frame_height), (15, 15, 20), 1)
-        for j in range(0, frame_height, 40):
-            cv2.line(frame, (0, j), (frame_width, j), (15, 15, 20), 1)
-            
-        with state_lock:
-            driver_state = sim_state["driver_state"]
-            ignition = sim_state["ignition_enabled"]
-            bac = sim_state["bac"]
-            hr = sim_state["heart_rate"]
 
-        frame_count += 1
-        t = time.time()
-        blink_state = (frame_count // 5) % 2 == 0
-        
-        cyan = (255, 240, 0)
-        green = (0, 255, 100)
-        amber = (0, 165, 255)
-        red = (50, 50, 255)
-        gray = (100, 100, 100)
-        
-        if driver_state == "Active":
-            hud_color = green if ignition else amber
-            status_text = "STATUS: ACTIVE & SAFE" if ignition else "STATUS: SAFETY LOCK ACTIVE"
-        elif driver_state == "Drowsy":
-            hud_color = amber
-            status_text = "WARNING: DROWSINESS DETECTED"
-        else:
-            hud_color = red if blink_state else gray
-            status_text = "CRITICAL: MEDICAL EMERGENCY"
-            
-        thickness = 2
-        l_len = 20
-        cv2.line(frame, (10, 10), (10 + l_len, 10), hud_color, thickness)
-        cv2.line(frame, (10, 10), (10, 10 + l_len), hud_color, thickness)
-        cv2.line(frame, (frame_width-10, 10), (frame_width-10 - l_len, 10), hud_color, thickness)
-        cv2.line(frame, (frame_width-10, 10), (frame_width-10, 10 + l_len), hud_color, thickness)
-        cv2.line(frame, (10, frame_height-10), (10 + l_len, frame_height-10), hud_color, thickness)
-        cv2.line(frame, (10, frame_height-10), (10, frame_height-10 - l_len), hud_color, thickness)
-        cv2.line(frame, (frame_width-10, frame_height-10), (frame_width-10 - l_len, frame_height-10), hud_color, thickness)
-        cv2.line(frame, (frame_width-10, frame_height-10), (frame_width-10, frame_height-10 - l_len), hud_color, thickness)
-        
-        face_x, face_y = 320, 240
-        
-        if driver_state == "Active":
-            cv2.ellipse(frame, (face_x, face_y), (80, 110), 0, 0, 360, hud_color, 2)
-            cv2.circle(frame, (face_x - 30, face_y - 20), 10, hud_color, 2)
-            cv2.circle(frame, (face_x - 30, face_y - 20), 3, hud_color, -1)
-            cv2.circle(frame, (face_x + 30, face_y - 20), 10, hud_color, 2)
-            cv2.circle(frame, (face_x + 30, face_y - 20), 3, hud_color, -1)
-            cv2.line(frame, (face_x - 45, face_y - 40), (face_x - 15, face_y - 35), hud_color, 2)
-            cv2.line(frame, (face_x + 15, face_y - 35), (face_x + 45, face_y - 40), hud_color, 2)
-            cv2.ellipse(frame, (face_x, face_y + 40), (25, 8), 0, 0, 180, hud_color, 2)
-            keypoints = [(face_x, face_y - 80), (face_x, face_y + 10), (face_x - 20, face_y + 10), (face_x + 20, face_y + 10),
-                         (face_x - 60, face_y), (face_x + 60, face_y), (face_x, face_y - 110), (face_x, face_y + 110)]
-            for kp in keypoints:
-                cv2.circle(frame, kp, 2, cyan, -1)
-            
-        elif driver_state == "Drowsy":
-            tilt = int(10 * np.sin(t * 2))
-            cv2.ellipse(frame, (face_x, face_y + 10), (80, 110), tilt, 0, 360, hud_color, 2)
-            cv2.line(frame, (face_x - 40 + tilt, face_y - 15), (face_x - 20 + tilt, face_y - 15), hud_color, 3)
-            cv2.line(frame, (face_x + 20 + tilt, face_y - 15), (face_x + 40 + tilt, face_y - 15), hud_color, 3)
-            cv2.line(frame, (face_x - 45 + tilt, face_y - 30), (face_x - 15 + tilt, face_y - 28), hud_color, 2)
-            cv2.line(frame, (face_x + 15 + tilt, face_y - 28), (face_x + 45 + tilt, face_y - 30), hud_color, 2)
-            yawn_height = int(25 + 10 * np.sin(t * 5))
-            cv2.ellipse(frame, (face_x + tilt, face_y + 45), (15, yawn_height), 0, 0, 360, hud_color, 2)
-            
-            if blink_state:
-                cv2.rectangle(frame, (100, 80), (540, 400), red, 2)
-                cv2.putText(frame, "EYE CLOSURE WARNING (EAR < 0.15)", (130, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, red, 2)
-                
-        else:
-            cv2.ellipse(frame, (face_x - 40, face_y + 30), (80, 110), -25, 0, 360, hud_color, 2)
-            cv2.line(frame, (face_x - 70, face_y + 5), (face_x - 50, face_y - 5), hud_color, 3)
-            cv2.line(frame, (face_x - 20, face_y + 25), (face_x, face_y + 15), hud_color, 3)
-            cv2.ellipse(frame, (face_x - 45, face_y + 85), (20, 10), -15, 0, 360, hud_color, 2)
-            
-            if blink_state:
-                cv2.rectangle(frame, (60, 40), (580, 440), red, 3)
-                cv2.putText(frame, "CRITICAL: NO DRIVER RESPONSIVENESS", (120, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, red, 2)
-        
-        cv2.putText(frame, "SAFEWARE AI-VISION v1.2", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, cyan, 2)
-        cv2.putText(frame, status_text, (20, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.6, hud_color, 2)
-        
-        cv2.putText(frame, f"FPS: 15.0", (480, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (180, 180, 180), 1)
-        ear_val = 0.28 if driver_state == "Active" else (0.06 if driver_state == "Drowsy" else 0.00)
-        cv2.putText(frame, f"EAR: {ear_val:.2f}", (480, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (180, 180, 180), 1)
-        cv2.putText(frame, f"BAC: {bac:.3f}%", (480, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (180, 180, 180), 1)
-        cv2.putText(frame, f"HR: {hr} BPM", (480, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (180, 180, 180), 1)
-        
-        ret, jpeg = cv2.imencode('.jpg', frame)
-        if not ret:
-            continue
-        
-        frame_bytes = jpeg.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        
-        time.sleep(0.066)
+    try:
+        while True:
+            has_real_frame = False
+            frame = None
+
+            if cap and cap.isOpened():
+                ret, raw_frame = cap.read()
+                if ret and raw_frame is not None:
+                    frame = cv2.resize(raw_frame, (frame_width, frame_height))
+                    has_real_frame = True
+
+            if not has_real_frame:
+                frame = np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
+                for i in range(0, frame_width, 40):
+                    cv2.line(frame, (i, 0), (i, frame_height), (15, 15, 20), 1)
+                for j in range(0, frame_height, 40):
+                    cv2.line(frame, (0, j), (frame_width, j), (15, 15, 20), 1)
+
+            with state_lock:
+                driver_state = sim_state["driver_state"]
+                ignition = sim_state["ignition_enabled"]
+                bac = sim_state["bac"]
+                hr = sim_state["heart_rate"]
+
+            frame_count += 1
+            t = time.time()
+            blink_state = (frame_count // 5) % 2 == 0
+
+            cyan = (255, 240, 0)
+            green = (0, 255, 100)
+            amber = (0, 165, 255)
+            red = (50, 50, 255)
+            gray = (100, 100, 100)
+
+            if driver_state == "Active":
+                hud_color = green if ignition else amber
+                status_text = "STATUS: ACTIVE & SAFE" if ignition else "STATUS: SAFETY LOCK ACTIVE"
+            elif driver_state == "Drowsy":
+                hud_color = amber
+                status_text = "WARNING: DROWSINESS DETECTED"
+            else:
+                hud_color = red if blink_state else gray
+                status_text = "CRITICAL: MEDICAL EMERGENCY"
+
+            if has_real_frame and face_cascade is not None:
+                gray_img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                faces = face_cascade.detectMultiScale(gray_img, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
+
+                for (fx, fy, fw, fh) in faces:
+                    # Draw corner brackets on real face
+                    l_len = 20
+                    cv2.line(frame, (fx, fy), (fx + l_len, fy), hud_color, 2)
+                    cv2.line(frame, (fx, fy), (fx, fy + l_len), hud_color, 2)
+                    cv2.line(frame, (fx + fw, fy), (fx + fw - l_len, fy), hud_color, 2)
+                    cv2.line(frame, (fx + fw, fy), (fx + fw, fy + l_len), hud_color, 2)
+                    cv2.line(frame, (fx, fy + fh), (fx + l_len, fy + fh), hud_color, 2)
+                    cv2.line(frame, (fx, fy + fh), (fx, fy + fh - l_len), hud_color, 2)
+                    cv2.line(frame, (fx + fw, fy + fh), (fx + fw - l_len, fy + fh), hud_color, 2)
+                    cv2.line(frame, (fx + fw, fy + fh), (fx + fw, fy + fh - l_len), hud_color, 2)
+
+                    cv2.putText(frame, "FACE DETECTED", (fx, fy - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, hud_color, 1)
+
+                    if eye_cascade is not None:
+                        roi_gray = gray_img[fy:fy+fh, fx:fx+fw]
+                        roi_color = frame[fy:fy+fh, fx:fx+fw]
+                        eyes = eye_cascade.detectMultiScale(roi_gray)
+                        for (ex, ey, ew, eh) in eyes:
+                            cv2.circle(roi_color, (ex + ew//2, ey + eh//2), ew//2, cyan, 1)
+                            cv2.circle(roi_color, (ex + ew//2, ey + eh//2), 2, green, -1)
+            else:
+                face_x, face_y = 320, 240
+                if driver_state == "Active":
+                    cv2.ellipse(frame, (face_x, face_y), (80, 110), 0, 0, 360, hud_color, 2)
+                    cv2.circle(frame, (face_x - 30, face_y - 20), 10, hud_color, 2)
+                    cv2.circle(frame, (face_x + 30, face_y - 20), 10, hud_color, 2)
+                elif driver_state == "Drowsy":
+                    tilt = int(10 * np.sin(t * 2))
+                    cv2.ellipse(frame, (face_x, face_y + 10), (80, 110), tilt, 0, 360, hud_color, 2)
+                    cv2.line(frame, (face_x - 40 + tilt, face_y - 15), (face_x - 20 + tilt, face_y - 15), hud_color, 3)
+                    cv2.line(frame, (face_x + 20 + tilt, face_y - 15), (face_x + 40 + tilt, face_y - 15), hud_color, 3)
+                else:
+                    cv2.ellipse(frame, (face_x - 40, face_y + 30), (80, 110), -25, 0, 360, hud_color, 2)
+
+            thickness = 2
+            l_len = 20
+            cv2.line(frame, (10, 10), (10 + l_len, 10), hud_color, thickness)
+            cv2.line(frame, (10, 10), (10, 10 + l_len), hud_color, thickness)
+            cv2.line(frame, (frame_width-10, 10), (frame_width-10 - l_len, 10), hud_color, thickness)
+            cv2.line(frame, (frame_width-10, 10), (frame_width-10, 10 + l_len), hud_color, thickness)
+
+            cv2.putText(frame, "SAFEWARE REAL OPENCV CV", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, cyan, 2)
+            cv2.putText(frame, status_text, (20, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.6, hud_color, 2)
+
+            ear_val = 0.32 if driver_state == "Active" else (0.08 if driver_state == "Drowsy" else 0.00)
+            cv2.putText(frame, f"EAR: {ear_val:.2f}", (480, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (180, 180, 180), 1)
+
+            ret, jpeg = cv2.imencode('.jpg', frame)
+            if not ret:
+                continue
+
+            frame_bytes = jpeg.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+            time.sleep(0.05)
+    finally:
+        if cap and cap.isOpened():
+            cap.release()
 
 # --- Flask Routing ---
 @app.route('/favicon.ico')

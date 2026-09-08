@@ -444,19 +444,13 @@
 
                     if (videoRef.current) {
                         videoRef.current.srcObject = stream;
-                        videoRef.current.onloadedmetadata = () => {
-                            videoRef.current.play().then(() => {
-                                setStatus('active');
-                            }).catch(pErr => {
-                                console.warn("Video play warning:", pErr);
-                                setStatus('active');
-                            });
-                        };
+                        videoRef.current.play().catch(pErr => console.warn("Video play warning:", pErr));
+                        setStatus('active');
                     } else {
                         setStatus('active');
                     }
                 } catch (err) {
-                    console.warn("Camera occupied or permission denied - switching to Python OpenCV server stream:", err);
+                    console.warn("Camera occupied or permission pending - switching to Python OpenCV server stream:", err);
                     setStatus('fallback');
                 }
             }, []);
