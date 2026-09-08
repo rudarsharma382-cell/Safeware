@@ -427,17 +427,14 @@
                 </div>
             );
         };
-
         // Custom Component: Direct Browser HTML5 WebRTC Live Webcam Feed with HUD Overlays
         const BrowserWebcamFeed = ({ driverState }) => {
             const videoRef = useRef(null);
             const canvasRef = useRef(null);
             const [status, setStatus] = useState('initializing');
-            const [errorMessage, setErrorMessage] = useState('');
 
             const startCam = useCallback(async () => {
                 setStatus('initializing');
-                setErrorMessage('');
                 try {
                     let stream = null;
                     try {
@@ -460,9 +457,8 @@
                         setStatus('active');
                     }
                 } catch (err) {
-                    console.error("Camera access error:", err);
-                    setStatus('denied');
-                    setErrorMessage(err.message || "Browser blocked camera access or camera is in use by another app.");
+                    console.warn("Camera occupied by Python server or browser permission pending - switching to server stream:", err);
+                    setStatus('fallback');
                 }
             }, []);
 
@@ -495,7 +491,7 @@
                         ctx.lineWidth = 3;
                         const l = 25;
                         ctx.beginPath(); ctx.moveTo(fx, fy + l); ctx.lineTo(fx, fy); ctx.lineTo(fx + l, fy); ctx.stroke();
-                        ctx.beginPath(); ctx.moveTo(fx + fw - l, fy); ctx.lineTo(fx + fw, fy); ctx.lineTo(fx + fw, fy + l); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(fx + fw - l, fy); ctx.lineTo(fx + fw); ctx.lineTo(fx + fw, fy + l); ctx.stroke();
                         ctx.beginPath(); ctx.moveTo(fx, fy + fh - l); ctx.lineTo(fx, fy + fh); ctx.lineTo(fx + l, fy + fh); ctx.stroke();
                         ctx.beginPath(); ctx.moveTo(fx + fw - l, fy + fh); ctx.lineTo(fx + fw, fy + fh); ctx.lineTo(fx + fw, fy + fh - l); ctx.stroke();
 
@@ -541,31 +537,22 @@
                         className={`absolute inset-0 w-full h-full pointer-events-none transform -scale-x-100 z-10 ${status === 'active' ? 'block' : 'hidden'}`} 
                     />
 
-                    {status === 'denied' && (
-                        <div className="p-6 text-center space-y-4 z-20">
-                            <div className="text-amber-400 font-mono text-xs font-bold uppercase tracking-wider">
-                                ⚠️ CAMERA ACCESS BLOCKED OR OCCUPIED
-                            </div>
-                            <p className="text-slate-400 text-xs font-sans max-w-sm mx-auto">
-                                {errorMessage || "Please allow camera access in your browser location bar icon."}
-                            </p>
-                            <button 
-                                onClick={startCam} 
-                                className="px-4 py-2 bg-[#00FFCC] hover:bg-[#00FFCC]/80 text-black font-mono font-bold text-xs rounded-xl shadow cursor-pointer transition-all"
-                            >
-                                Re-Request Camera Access 🎥
-                            </button>
-                        </div>
+                    {(status === 'fallback' || status === 'denied') && (
+                        <img 
+                            src="/video_feed" 
+                            className="w-full h-full object-cover" 
+                            alt="Python AI Camera Stream" 
+                        />
                     )}
 
                     {status === 'initializing' && (
                         <div className="text-cyan-400 font-mono text-xs font-bold animate-pulse z-20">
-                            [REQUESTING CAMERA PERMISSION...]
+                            [INITIALIZING WEBCAM STREAM...]
                         </div>
                     )}
                 </div>
             );
-        };
+        };       };
 
         // Custom Component: Highly Sophisticated Minimalist Sci-Fi Biometric Human Profile
         const FaceMeshVisualizer = ({ driverState, bac }) => {
