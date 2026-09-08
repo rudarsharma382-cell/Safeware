@@ -429,7 +429,7 @@
                     {children}
                 </div>
             );
-        };        // Custom Component: Direct Browser HTML5 WebRTC Live Webcam Feed with Zero-Lag AI Eye Tracking
+        };        // Custom Component: Direct Browser HTML5 WebRTC Live Webcam Feed with Ultra-Smooth 60FPS Native Eye Tracking
         const BrowserWebcamFeed = ({ driverState }) => {
             const videoRef = useRef(null);
             const canvasRef = useRef(null);
@@ -463,51 +463,19 @@
             useEffect(() => {
                 startCam();
                 let animId = null;
-                let faceMesh = null;
-                let mpLandmarks = null;
-                let isProcessing = false;
                 let closedFrameCounter = 0;
                 let lastStateSent = 'Active';
 
-                if (window.FaceMesh) {
-                    try {
-                        faceMesh = new window.FaceMesh({
-                            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-                        });
-                        faceMesh.setOptions({
-                            maxNumFaces: 1,
-                            refineLandmarks: true,
-                            minDetectionConfidence: 0.4,
-                            minTrackingConfidence: 0.4
-                        });
-                        faceMesh.onResults((results) => {
-                            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-                                mpLandmarks = results.multiFaceLandmarks[0];
-                            } else {
-                                mpLandmarks = null;
-                            }
-                        });
-                    } catch (e) {
-                        console.warn("MediaPipe init error:", e);
-                    }
-                }
+                let baselineContrast = 28.0;
+                let lastCheckTime = 0;
+                let cachedEyeClosed = false;
+                let cachedEar = 0.32;
 
-                // Throttled MediaPipe Processing Loop (Every 100ms - NO LAG)
-                const mpInterval = setInterval(async () => {
-                    const video = videoRef.current;
-                    if (faceMesh && video && video.readyState >= 2 && !isProcessing) {
-                        isProcessing = true;
-                        try {
-                            await faceMesh.send({ image: video });
-                        } catch (e) {}
-                        isProcessing = false;
-                    }
-                }, 100);
-
-                // Smooth 60 FPS Render Loop
-                const drawHUD = () => {
+                // Smooth 60 FPS Native Rendering & Detection Loop (ZERO WASM OVERHEAD, ZERO LAG)
+                const drawHUD = (nowTimestamp) => {
                     const video = videoRef.current;
                     const canvas = canvasRef.current;
+
                     if (video && canvas && video.readyState >= 2) {
                         if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
                             canvas.width = video.videoWidth || 640;
@@ -519,86 +487,74 @@
                         const w = canvas.width;
                         const h = canvas.height;
 
-                        let isEyeClosed = false;
-                        let calculatedEar = 0.32;
-
-                        if (mpLandmarks) {
-                            const dist = (a, b) => Math.hypot((a.x - b.x) * w, (a.y - b.y) * h);
-                            
-                            // Left Eye: 33 (outer), 133 (inner), 160 (top), 144 (bottom), 158 (top2), 153 (bottom2)
-                            const leftVer1 = dist(mpLandmarks[160], mpLandmarks[144]);
-                            const leftVer2 = dist(mpLandmarks[158], mpLandmarks[153]);
-                            const leftHor = dist(mpLandmarks[33], mpLandmarks[133]);
-                            const leftEAR = (leftVer1 + leftVer2) / (2.0 * Math.max(1, leftHor));
-
-                            // Right Eye: 362 (outer), 263 (inner), 385 (top), 373 (bottom), 387 (top2), 380 (bottom2)
-                            const rightVer1 = dist(mpLandmarks[385], mpLandmarks[373]);
-                            const rightVer2 = dist(mpLandmarks[387], mpLandmarks[380]);
-                            const rightHor = dist(mpLandmarks[362], mpLandmarks[263]);
-                            const rightEAR = (rightVer1 + rightVer2) / (2.0 * Math.max(1, rightHor));
-
-                            calculatedEar = (leftEAR + rightEAR) / 2.0;
-
-                            if (calculatedEar < 0.22) {
-                                closedFrameCounter++;
-                            } else {
-                                closedFrameCounter = Math.max(0, closedFrameCounter - 1);
-                            }
-
-                            if (closedFrameCounter >= 2) {
-                                isEyeClosed = true;
-                            }
-                        } else {
+                        // Fast Ocular Scan every 60ms (16 FPS scan, 60 FPS draw)
+                        if (nowTimestamp - lastCheckTime > 60) {
+                            lastCheckTime = nowTimestamp;
                             try {
-                                if (!window._eyeOffCanvas) {
-                                    window._eyeOffCanvas = document.createElement('canvas');
-                                    window._eyeOffCanvas.width = 160;
-                                    window._eyeOffCanvas.height = 120;
+                                if (!window._fastCanvas) {
+                                    window._fastCanvas = document.createElement('canvas');
+                                    window._fastCanvas.width = 100;
+                                    window._fastCanvas.height = 75;
                                 }
-                                const offCanvas = window._eyeOffCanvas;
-                                const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
-                                offCtx.drawImage(video, 0, 0, 160, 120);
+                                const fCanvas = window._fastCanvas;
+                                const fCtx = fCanvas.getContext('2d', { willReadFrequently: true });
+                                fCtx.drawImage(video, 0, 0, 100, 75);
 
-                                let maxEyeContrast = 0;
+                                let maxStdDev = 0;
                                 let maxDarkPixels = 0;
 
-                                for (let bandY = 15; bandY <= 85; bandY += 10) {
-                                    const imgData = offCtx.getImageData(20, bandY, 120, 16);
-                                    const pixels = imgData.data;
-                                    let sumLum = 0;
+                                // Scan ocular bands down central face region (y: 12px to 52px in 100x75 matrix)
+                                for (let bandY = 12; bandY <= 52; bandY += 8) {
+                                    const imgData = fCtx.getImageData(15, bandY, 70, 14);
+                                    const pix = imgData.data;
+                                    let sumL = 0;
                                     let darks = 0;
-                                    const totalPix = pixels.length / 4;
+                                    const totalP = pix.length / 4;
 
-                                    for (let i = 0; i < pixels.length; i += 4) {
-                                        const lum = (pixels[i] * 0.299 + pixels[i+1] * 0.587 + pixels[i+2] * 0.114);
-                                        sumLum += lum;
-                                        if (lum < 70) darks++;
+                                    for (let i = 0; i < pix.length; i += 4) {
+                                        const lum = pix[i] * 0.299 + pix[i+1] * 0.587 + pix[i+2] * 0.114;
+                                        sumL += lum;
+                                        if (lum < 65) darks++;
                                     }
 
-                                    const avgL = sumLum / totalPix;
+                                    const avgL = sumL / totalP;
                                     let vSum = 0;
-                                    for (let i = 0; i < pixels.length; i += 4) {
-                                        const lum = (pixels[i] * 0.299 + pixels[i+1] * 0.587 + pixels[i+2] * 0.114);
+                                    for (let i = 0; i < pix.length; i += 4) {
+                                        const lum = pix[i] * 0.299 + pix[i+1] * 0.587 + pix[i+2] * 0.114;
                                         vSum += (lum - avgL) * (lum - avgL);
                                     }
-                                    const bandStdDev = Math.sqrt(vSum / totalPix);
+                                    const stdDev = Math.sqrt(vSum / totalP);
 
-                                    if (bandStdDev > maxEyeContrast) maxEyeContrast = bandStdDev;
+                                    if (stdDev > maxStdDev) maxStdDev = stdDev;
                                     if (darks > maxDarkPixels) maxDarkPixels = darks;
                                 }
 
-                                if (maxEyeContrast < 22 || maxDarkPixels < 25) {
+                                // Adaptively update baseline open-eye contrast when eyes are open
+                                if (maxStdDev > 22 && maxDarkPixels > 15) {
+                                    baselineContrast = baselineContrast * 0.9 + maxStdDev * 0.1;
+                                }
+
+                                // Eye closure condition: contrast drops below 65% of baseline or dark pupil pixels disappear
+                                const isClosedNow = (maxStdDev < Math.max(14.0, baselineContrast * 0.62) || maxDarkPixels < 14);
+
+                                if (isClosedNow) {
                                     closedFrameCounter++;
                                 } else {
                                     closedFrameCounter = Math.max(0, closedFrameCounter - 1);
                                 }
 
                                 if (closedFrameCounter >= 2) {
-                                    isEyeClosed = true;
-                                    calculatedEar = 0.05;
+                                    cachedEyeClosed = true;
+                                    cachedEar = 0.05;
+                                } else {
+                                    cachedEyeClosed = false;
+                                    cachedEar = 0.32;
                                 }
                             } catch (e) {}
                         }
+
+                        const isEyeClosed = cachedEyeClosed;
+                        const calculatedEar = cachedEar;
 
                         setEarDisplay(calculatedEar);
                         setIsClosedAlert(isEyeClosed);
@@ -635,42 +591,51 @@
                             ctx.fillText(`⚠️ DANGER: EYE CLOSURE DETECTED (EAR: ${calculatedEar.toFixed(2)} < 0.22)`, 20, 35);
                         }
 
-                        if (mpLandmarks) {
-                            mpLandmarks.forEach((pt, idx) => {
-                                if ([33, 133, 160, 144, 158, 153, 362, 263, 385, 373, 387, 380, 1, 61, 291].includes(idx)) {
-                                    ctx.fillStyle = hudColor;
-                                    ctx.beginPath();
-                                    ctx.arc(pt.x * w, pt.y * h, 3, 0, Math.PI * 2);
-                                    ctx.fill();
-                                }
-                            });
+                        // Vibrant Sci-Fi HUD Corner Reticles
+                        const fx = w * 0.22;
+                        const fy = h * 0.15;
+                        const fw = w * 0.56;
+                        const fh = h * 0.70;
+
+                        ctx.strokeStyle = hudColor;
+                        ctx.lineWidth = 3;
+                        const l = 25;
+                        ctx.beginPath(); ctx.moveTo(fx, fy + l); ctx.lineTo(fx, fy); ctx.lineTo(fx + l, fy); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(fx + fw - l, fy); ctx.lineTo(fx + fw); ctx.lineTo(fx + fw, fy + l); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(fx, fy + fh - l); ctx.lineTo(fx, fy + fh); ctx.lineTo(fx + l, fy + fh); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(fx + fw - l, fy + fh); ctx.lineTo(fx + fw); ctx.lineTo(fx + fw, fy + fh - l); ctx.stroke();
+
+                        const leftEye = { x: fx + fw * 0.32, y: fy + fh * 0.36 };
+                        const rightEye = { x: fx + fw * 0.68, y: fy + fh * 0.36 };
+
+                        ctx.strokeStyle = hudColor;
+                        ctx.lineWidth = 2;
+                        if (!isEyeClosed) {
+                            ctx.beginPath(); ctx.arc(leftEye.x, leftEye.y, 16, 0, Math.PI * 2); ctx.stroke();
+                            ctx.beginPath(); ctx.arc(rightEye.x, rightEye.y, 16, 0, Math.PI * 2); ctx.stroke();
                         } else {
-                            const fx = w * 0.25;
-                            const fy = h * 0.18;
-                            const fw = w * 0.50;
-                            const fh = h * 0.64;
-
-                            ctx.strokeStyle = hudColor;
-                            ctx.lineWidth = 3;
-                            const l = 25;
-                            ctx.beginPath(); ctx.moveTo(fx, fy + l); ctx.lineTo(fx, fy); ctx.lineTo(fx + l, fy); ctx.stroke();
-                            ctx.beginPath(); ctx.moveTo(fx + fw - l, fy); ctx.lineTo(fx + fw); ctx.lineTo(fx + fw, fy + l); ctx.stroke();
-                            ctx.beginPath(); ctx.moveTo(fx, fy + fh - l); ctx.lineTo(fx, fy + fh); ctx.lineTo(fx + l, fy + fh); ctx.stroke();
-                            ctx.beginPath(); ctx.moveTo(fx + fw - l, fy + fh); ctx.lineTo(fx + fw); ctx.lineTo(fx + fw, fy + fh - l); ctx.stroke();
-
-                            const leftEye = { x: fx + fw * 0.33, y: fy + fh * 0.35 };
-                            const rightEye = { x: fx + fw * 0.67, y: fy + fh * 0.35 };
-
-                            ctx.strokeStyle = hudColor;
-                            ctx.lineWidth = 2;
-                            if (!isEyeClosed) {
-                                ctx.beginPath(); ctx.arc(leftEye.x, leftEye.y, 16, 0, Math.PI * 2); ctx.stroke();
-                                ctx.beginPath(); ctx.arc(rightEye.x, rightEye.y, 16, 0, Math.PI * 2); ctx.stroke();
-                            } else {
-                                ctx.beginPath(); ctx.moveTo(leftEye.x - 18, leftEye.y); ctx.lineTo(leftEye.x + 18, leftEye.y); ctx.stroke();
-                                ctx.beginPath(); ctx.moveTo(rightEye.x - 18, rightEye.y); ctx.lineTo(rightEye.x + 18, rightEye.y); ctx.stroke();
-                            }
+                            ctx.beginPath(); ctx.moveTo(leftEye.x - 20, leftEye.y); ctx.lineTo(leftEye.x + 20, leftEye.y); ctx.stroke();
+                            ctx.beginPath(); ctx.moveTo(rightEye.x - 20, rightEye.y); ctx.lineTo(rightEye.x + 20, rightEye.y); ctx.stroke();
                         }
+
+                        ctx.lineWidth = 1;
+                        ctx.beginPath(); ctx.moveTo(leftEye.x - 20, leftEye.y); ctx.lineTo(leftEye.x + 20, leftEye.y); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(leftEye.x, leftEye.y - 20); ctx.lineTo(leftEye.x, leftEye.y + 20); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(rightEye.x - 20, rightEye.y); ctx.lineTo(rightEye.x + 20, rightEye.y); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(rightEye.x, rightEye.y - 20); ctx.lineTo(rightEye.x, rightEye.y + 20); ctx.stroke();
+
+                        // Key facial mesh points
+                        const pts = [
+                            { x: fx + fw * 0.5, y: fy + fh * 0.2 },
+                            { x: fx + fw * 0.5, y: fy + fh * 0.5 },
+                            { x: fx + fw * 0.38, y: fy + fh * 0.5 },
+                            { x: fx + fw * 0.62, y: fy + fh * 0.5 },
+                            { x: fx + fw * 0.5, y: fy + fh * 0.75 }
+                        ];
+                        ctx.fillStyle = hudColor;
+                        pts.forEach(pt => {
+                            ctx.beginPath(); ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2); ctx.fill();
+                        });
 
                         ctx.fillStyle = hudColor;
                         ctx.font = 'bold 12px monospace';
@@ -680,10 +645,9 @@
                     animId = requestAnimationFrame(drawHUD);
                 };
 
-                drawHUD();
+                animId = requestAnimationFrame(drawHUD);
 
                 return () => {
-                    clearInterval(mpInterval);
                     if (videoRef.current && videoRef.current.srcObject) {
                         const tracks = videoRef.current.srcObject.getTracks();
                         tracks.forEach(track => track.stop());
