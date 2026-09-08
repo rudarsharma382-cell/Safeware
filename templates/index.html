@@ -429,20 +429,22 @@
                     {children}
                 </div>
             );
-        };        // Custom Component: Direct Browser HTML5 WebRTC Live Webcam Feed with HUD Overlays
+        };        // Custom Component: Direct Browser HTML5 WebRTC Live Webcam Feed with Zero-Lag AI Eye Tracking
         const BrowserWebcamFeed = ({ driverState }) => {
             const videoRef = useRef(null);
             const canvasRef = useRef(null);
             const [status, setStatus] = useState('initializing');
+            const [earDisplay, setEarDisplay] = useState(0.32);
+            const [isClosedAlert, setIsClosedAlert] = useState(false);
 
             const startCam = useCallback(async () => {
                 setStatus('initializing');
                 try {
                     let stream = null;
                     try {
-                        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 } } });
                     } catch (e1) {
-                        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                        stream = await navigator.mediaDevices.getUserMedia({ video: true });
                     }
 
                     if (videoRef.current) {
@@ -461,10 +463,11 @@
             useEffect(() => {
                 startCam();
                 let animId = null;
-                let closedFrameCounter = 0;
-                let lastStateSent = 'Active';
                 let faceMesh = null;
                 let mpLandmarks = null;
+                let isProcessing = false;
+                let closedFrameCounter = 0;
+                let lastStateSent = 'Active';
 
                 if (window.FaceMesh) {
                     try {
@@ -474,8 +477,8 @@
                         faceMesh.setOptions({
                             maxNumFaces: 1,
                             refineLandmarks: true,
-                            minDetectionConfidence: 0.5,
-                            minTrackingConfidence: 0.5
+                            minDetectionConfidence: 0.4,
+                            minTrackingConfidence: 0.4
                         });
                         faceMesh.onResults((results) => {
                             if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
@@ -489,7 +492,20 @@
                     }
                 }
 
-                const drawHUD = async () => {
+                // Throttled MediaPipe Processing Loop (Every 100ms - NO LAG)
+                const mpInterval = setInterval(async () => {
+                    const video = videoRef.current;
+                    if (faceMesh && video && video.readyState >= 2 && !isProcessing) {
+                        isProcessing = true;
+                        try {
+                            await faceMesh.send({ image: video });
+                        } catch (e) {}
+                        isProcessing = false;
+                    }
+                }, 100);
+
+                // Smooth 60 FPS Render Loop
+                const drawHUD = () => {
                     const video = videoRef.current;
                     const canvas = canvasRef.current;
                     if (video && canvas && video.readyState >= 2) {
@@ -503,25 +519,19 @@
                         const w = canvas.width;
                         const h = canvas.height;
 
-                        if (faceMesh && video.currentTime > 0) {
-                            try {
-                                await faceMesh.send({ image: video });
-                            } catch (e) {}
-                        }
-
                         let isEyeClosed = false;
                         let calculatedEar = 0.32;
 
                         if (mpLandmarks) {
                             const dist = (a, b) => Math.hypot((a.x - b.x) * w, (a.y - b.y) * h);
                             
-                            // Left Eye Landmarks: 33 (outer), 133 (inner), 160 (top), 144 (bottom), 158 (top2), 153 (bottom2)
+                            // Left Eye: 33 (outer), 133 (inner), 160 (top), 144 (bottom), 158 (top2), 153 (bottom2)
                             const leftVer1 = dist(mpLandmarks[160], mpLandmarks[144]);
                             const leftVer2 = dist(mpLandmarks[158], mpLandmarks[153]);
                             const leftHor = dist(mpLandmarks[33], mpLandmarks[133]);
                             const leftEAR = (leftVer1 + leftVer2) / (2.0 * Math.max(1, leftHor));
 
-                            // Right Eye Landmarks: 362 (outer), 263 (inner), 385 (top), 373 (bottom), 387 (top2), 380 (bottom2)
+                            // Right Eye: 362 (outer), 263 (inner), 385 (top), 373 (bottom), 387 (top2), 380 (bottom2)
                             const rightVer1 = dist(mpLandmarks[385], mpLandmarks[373]);
                             const rightVer2 = dist(mpLandmarks[387], mpLandmarks[380]);
                             const rightHor = dist(mpLandmarks[362], mpLandmarks[263]);
@@ -529,7 +539,7 @@
 
                             calculatedEar = (leftEAR + rightEAR) / 2.0;
 
-                            if (calculatedEar < 0.18) {
+                            if (calculatedEar < 0.22) {
                                 closedFrameCounter++;
                             } else {
                                 closedFrameCounter = Math.max(0, closedFrameCounter - 1);
@@ -552,8 +562,8 @@
                                 let maxEyeContrast = 0;
                                 let maxDarkPixels = 0;
 
-                                for (let bandY = 20; bandY <= 75; bandY += 10) {
-                                    const imgData = offCtx.getImageData(25, bandY, 110, 18);
+                                for (let bandY = 15; bandY <= 85; bandY += 10) {
+                                    const imgData = offCtx.getImageData(20, bandY, 120, 16);
                                     const pixels = imgData.data;
                                     let sumLum = 0;
                                     let darks = 0;
@@ -562,7 +572,7 @@
                                     for (let i = 0; i < pixels.length; i += 4) {
                                         const lum = (pixels[i] * 0.299 + pixels[i+1] * 0.587 + pixels[i+2] * 0.114);
                                         sumLum += lum;
-                                        if (lum < 65) darks++;
+                                        if (lum < 70) darks++;
                                     }
 
                                     const avgL = sumLum / totalPix;
@@ -577,7 +587,7 @@
                                     if (darks > maxDarkPixels) maxDarkPixels = darks;
                                 }
 
-                                if (maxEyeContrast < 20 || maxDarkPixels < 20) {
+                                if (maxEyeContrast < 22 || maxDarkPixels < 25) {
                                     closedFrameCounter++;
                                 } else {
                                     closedFrameCounter = Math.max(0, closedFrameCounter - 1);
@@ -589,6 +599,9 @@
                                 }
                             } catch (e) {}
                         }
+
+                        setEarDisplay(calculatedEar);
+                        setIsClosedAlert(isEyeClosed);
 
                         const effectiveState = isEyeClosed ? 'Drowsy' : driverState;
 
@@ -611,7 +624,7 @@
 
                         const hudColor = effectiveState === 'Active' ? '#00FFCC' : '#ef4444';
 
-                        // Outer Flashing Danger Border when Eye Closed
+                        // Outer Flashing Red Danger Border when Eye Closed
                         if (effectiveState === 'Drowsy' || isEyeClosed) {
                             ctx.strokeStyle = '#ef4444';
                             ctx.lineWidth = 6;
@@ -619,7 +632,7 @@
 
                             ctx.fillStyle = '#ef4444';
                             ctx.font = 'bold 16px monospace';
-                            ctx.fillText(`⚠️ DANGER: EYE CLOSURE DETECTED (EAR: ${calculatedEar.toFixed(2)} < 0.18)`, 20, 35);
+                            ctx.fillText(`⚠️ DANGER: EYE CLOSURE DETECTED (EAR: ${calculatedEar.toFixed(2)} < 0.22)`, 20, 35);
                         }
 
                         if (mpLandmarks) {
@@ -670,6 +683,7 @@
                 drawHUD();
 
                 return () => {
+                    clearInterval(mpInterval);
                     if (videoRef.current && videoRef.current.srcObject) {
                         const tracks = videoRef.current.srcObject.getTracks();
                         tracks.forEach(track => track.stop());
