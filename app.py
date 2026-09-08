@@ -82,6 +82,7 @@ def generate_camera_frames():
     frame_width = 640
     frame_height = 480
     frame_count = 0
+    closed_eye_count = 0
 
     try:
         while True:
@@ -117,41 +118,60 @@ def generate_camera_frames():
             red = (50, 50, 255)
             gray = (100, 100, 100)
 
-            if driver_state == "Active":
-                hud_color = green if ignition else amber
-                status_text = "STATUS: ACTIVE & SAFE" if ignition else "STATUS: SAFETY LOCK ACTIVE"
-            elif driver_state == "Drowsy":
-                hud_color = amber
-                status_text = "WARNING: DROWSINESS DETECTED"
-            else:
-                hud_color = red if blink_state else gray
-                status_text = "CRITICAL: MEDICAL EMERGENCY"
+            eye_closure_detected = False
 
             if has_real_frame and face_cascade is not None:
                 gray_img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 faces = face_cascade.detectMultiScale(gray_img, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
 
-                for (fx, fy, fw, fh) in faces:
-                    # Draw corner brackets on real face
-                    l_len = 20
-                    cv2.line(frame, (fx, fy), (fx + l_len, fy), hud_color, 2)
-                    cv2.line(frame, (fx, fy), (fx, fy + l_len), hud_color, 2)
-                    cv2.line(frame, (fx + fw, fy), (fx + fw - l_len, fy), hud_color, 2)
-                    cv2.line(frame, (fx + fw, fy), (fx + fw, fy + l_len), hud_color, 2)
-                    cv2.line(frame, (fx, fy + fh), (fx + l_len, fy + fh), hud_color, 2)
-                    cv2.line(frame, (fx, fy + fh), (fx, fy + fh - l_len), hud_color, 2)
-                    cv2.line(frame, (fx + fw, fy + fh), (fx + fw - l_len, fy + fh), hud_color, 2)
-                    cv2.line(frame, (fx + fw, fy + fh), (fx + fw, fy + fh - l_len), hud_color, 2)
+                if len(faces) > 0:
+                    for (fx, fy, fw, fh) in faces:
+                        # Draw corner brackets on real face
+                        l_len = 20
+                        cv2.line(frame, (fx, fy), (fx + l_len, fy), hud_color if not eye_closure_detected else red, 2)
+                        cv2.line(frame, (fx, fy), (fx, fy + l_len), hud_color if not eye_closure_detected else red, 2)
+                        cv2.line(frame, (fx + fw, fy), (fx + fw - l_len, fy), hud_color if not eye_closure_detected else red, 2)
+                        cv2.line(frame, (fx + fw, fy), (fx + fw, fy + l_len), hud_color if not eye_closure_detected else red, 2)
+                        cv2.line(frame, (fx, fy + fh), (fx + l_len, fy + fh), hud_color if not eye_closure_detected else red, 2)
+                        cv2.line(frame, (fx, fy + fh), (fx, fy + fh - l_len), hud_color if not eye_closure_detected else red, 2)
+                        cv2.line(frame, (fx + fw, fy + fh), (fx + fw - l_len, fy + fh), hud_color if not eye_closure_detected else red, 2)
+                        cv2.line(frame, (fx + fw, fy + fh), (fx + fw, fy + fh - l_len), hud_color if not eye_closure_detected else red, 2)
 
-                    cv2.putText(frame, "FACE DETECTED", (fx, fy - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, hud_color, 1)
+                        if eye_cascade is not None:
+                            roi_gray = gray_img[fy:fy+int(fh*0.65), fx:fx+fw]
+                            roi_color = frame[fy:fy+int(fh*0.65), fx:fx+fw]
+                            eyes = eye_cascade.detectMultiScale(roi_gray, scaleFactor=1.1, minNeighbors=3, minSize=(12, 12))
 
-                    if eye_cascade is not None:
-                        roi_gray = gray_img[fy:fy+fh, fx:fx+fw]
-                        roi_color = frame[fy:fy+fh, fx:fx+fw]
-                        eyes = eye_cascade.detectMultiScale(roi_gray)
-                        for (ex, ey, ew, eh) in eyes:
-                            cv2.circle(roi_color, (ex + ew//2, ey + eh//2), ew//2, cyan, 1)
-                            cv2.circle(roi_color, (ex + ew//2, ey + eh//2), 2, green, -1)
+                            if len(eyes) == 0:
+                                closed_eye_count += 1
+                            else:
+                                closed_eye_count = max(0, closed_eye_count - 1)
+
+                            for (ex, ey, ew, eh) in eyes:
+                                cv2.circle(roi_color, (ex + ew//2, ey + eh//2), ew//2, cyan, 1)
+                                cv2.circle(roi_color, (ex + ew//2, ey + eh//2), 2, green, -1)
+
+                if closed_eye_count >= 2:
+                    eye_closure_detected = True
+                    with state_lock:
+                        sim_state["driver_state"] = "Drowsy"
+                elif closed_eye_count == 0 and driver_state == "Drowsy" and frame_count % 30 == 0:
+                    with state_lock:
+                        sim_state["driver_state"] = "Active"
+
+            if driver_state == "Active" and not eye_closure_detected:
+                hud_color = green if ignition else amber
+                status_text = "STATUS: ACTIVE & SAFE" if ignition else "STATUS: SAFETY LOCK ACTIVE"
+            elif driver_state == "Drowsy" or eye_closure_detected:
+                hud_color = red if blink_state else amber
+                status_text = "DANGER: EYE CLOSURE DETECTED!"
+            else:
+                hud_color = red if blink_state else gray
+                status_text = "CRITICAL: MEDICAL EMERGENCY"
+
+            if eye_closure_detected or driver_state == "Drowsy":
+                cv2.rectangle(frame, (10, 10), (frame_width-10, frame_height-10), red, 4)
+                cv2.putText(frame, "DANGER: EYE CLOSURE DETECTED (EAR < 0.15)", (40, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.65, red, 2)
             else:
                 face_x, face_y = 320, 240
                 if driver_state == "Active":
