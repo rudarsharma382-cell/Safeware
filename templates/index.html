@@ -426,8 +426,7 @@
                     {children}
                 </div>
             );
-        };
-        // Custom Component: Direct Browser HTML5 WebRTC Live Webcam Feed with HUD Overlays
+        };        // Custom Component: Direct Browser HTML5 WebRTC Live Webcam Feed with HUD Overlays
         const BrowserWebcamFeed = ({ driverState }) => {
             const videoRef = useRef(null);
             const canvasRef = useRef(null);
@@ -457,7 +456,7 @@
                         setStatus('active');
                     }
                 } catch (err) {
-                    console.warn("Camera occupied by Python server or browser permission pending - switching to server stream:", err);
+                    console.warn("Camera occupied or permission denied - switching to Python OpenCV server stream:", err);
                     setStatus('fallback');
                 }
             }, []);
@@ -481,24 +480,26 @@
                         const h = canvas.height;
 
                         const fx = w * 0.25;
-                        const fy = h * 0.20;
+                        const fy = h * 0.18;
                         const fw = w * 0.50;
-                        const fh = h * 0.60;
+                        const fh = h * 0.64;
 
                         const hudColor = driverState === 'Active' ? '#00FFCC' : (driverState === 'Drowsy' ? '#f59e0b' : '#ef4444');
 
+                        // Face Bounding Box Corners
                         ctx.strokeStyle = hudColor;
                         ctx.lineWidth = 3;
                         const l = 25;
                         ctx.beginPath(); ctx.moveTo(fx, fy + l); ctx.lineTo(fx, fy); ctx.lineTo(fx + l, fy); ctx.stroke();
                         ctx.beginPath(); ctx.moveTo(fx + fw - l, fy); ctx.lineTo(fx + fw); ctx.lineTo(fx + fw, fy + l); ctx.stroke();
                         ctx.beginPath(); ctx.moveTo(fx, fy + fh - l); ctx.lineTo(fx, fy + fh); ctx.lineTo(fx + l, fy + fh); ctx.stroke();
-                        ctx.beginPath(); ctx.moveTo(fx + fw - l, fy + fh); ctx.lineTo(fx + fw, fy + fh); ctx.lineTo(fx + fw, fy + fh - l); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(fx + fw - l, fy + fh); ctx.lineTo(fx + fw); ctx.lineTo(fx + fw, fy + fh - l); ctx.stroke();
 
+                        // Eye Landmark Target Circles
                         const leftEye = { x: fx + fw * 0.33, y: fy + fh * 0.35 };
                         const rightEye = { x: fx + fw * 0.67, y: fy + fh * 0.35 };
 
-                        ctx.strokeStyle = "#00FFCC";
+                        ctx.strokeStyle = hudColor;
                         ctx.lineWidth = 2;
                         ctx.beginPath(); ctx.arc(leftEye.x, leftEye.y, 16, 0, Math.PI * 2); ctx.stroke();
                         ctx.beginPath(); ctx.arc(rightEye.x, rightEye.y, 16, 0, Math.PI * 2); ctx.stroke();
@@ -508,6 +509,25 @@
                         ctx.beginPath(); ctx.moveTo(leftEye.x, leftEye.y - 20); ctx.lineTo(leftEye.x, leftEye.y + 20); ctx.stroke();
                         ctx.beginPath(); ctx.moveTo(rightEye.x - 20, rightEye.y); ctx.lineTo(rightEye.x + 20, rightEye.y); ctx.stroke();
                         ctx.beginPath(); ctx.moveTo(rightEye.x, rightEye.y - 20); ctx.lineTo(rightEye.x, rightEye.y + 20); ctx.stroke();
+
+                        // Key facial mesh points
+                        const pts = [
+                            { x: fx + fw * 0.5, y: fy + fh * 0.2 },
+                            { x: fx + fw * 0.5, y: fy + fh * 0.5 },
+                            { x: fx + fw * 0.38, y: fy + fh * 0.5 },
+                            { x: fx + fw * 0.62, y: fy + fh * 0.5 },
+                            { x: fx + fw * 0.5, y: fy + fh * 0.75 }
+                        ];
+                        ctx.fillStyle = "#00FFCC";
+                        pts.forEach(pt => {
+                            ctx.beginPath(); ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2); ctx.fill();
+                        });
+
+                        // Status text banner
+                        ctx.fillStyle = hudColor;
+                        ctx.font = 'bold 12px monospace';
+                        const earText = driverState === 'Active' ? 'EAR: 0.32 [NOMINAL]' : (driverState === 'Drowsy' ? 'EAR: 0.08 [FATIGUE ALERT]' : 'EAR: 0.00 [CRITICAL]');
+                        ctx.fillText(earText, fx + 10, fy - 10);
                     }
                     animId = requestAnimationFrame(drawHUD);
                 };
@@ -546,8 +566,16 @@
                     )}
 
                     {status === 'initializing' && (
-                        <div className="text-cyan-400 font-mono text-xs font-bold animate-pulse z-20">
-                            [INITIALIZING WEBCAM STREAM...]
+                        <div className="flex flex-col items-center gap-3 z-20">
+                            <div className="text-cyan-400 font-mono text-xs font-bold animate-pulse">
+                                [REQUESTING WEBCAM PERMISSION...]
+                            </div>
+                            <button 
+                                onClick={startCam}
+                                className="px-3 py-1.5 bg-cyan-500 text-black text-[10px] font-mono font-bold rounded shadow hover:bg-cyan-400"
+                            >
+                                Grant Camera Access Now
+                            </button>
                         </div>
                     )}
                 </div>
@@ -1060,7 +1088,7 @@
         // Main App Component
         const App = () => {
             const [activeTab, setActiveTab] = useState('presentation');
-            const [visionMode, setVisionMode] = useState('mesh'); 
+            const [visionMode, setVisionMode] = useState('webcam'); 
             const [isAudioPlaying, setIsAudioPlaying] = useState(false);
             const [telemetry, setTelemetry] = useState({
                 ignition_enabled: true,
