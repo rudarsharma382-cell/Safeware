@@ -480,38 +480,55 @@
                         const fw = w * 0.50;
                         const fh = h * 0.64;
 
-                        // Real-time eye closure contrast analysis on upper face region
+                        // Real-time video frame luminance & contrast analysis for eye closure detection
                         let isEyeClosed = false;
                         try {
-                            const eyeX = fx + fw * 0.2;
-                            const eyeY = fy + fh * 0.25;
-                            const eyeW = fw * 0.6;
-                            const eyeH = fh * 0.25;
+                            if (!window._eyeOffCanvas) {
+                                window._eyeOffCanvas = document.createElement('canvas');
+                                window._eyeOffCanvas.width = 160;
+                                window._eyeOffCanvas.height = 120;
+                            }
+                            const offCanvas = window._eyeOffCanvas;
+                            const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+                            offCtx.drawImage(video, 0, 0, 160, 120);
 
-                            const imgData = ctx.getImageData(eyeX, eyeY, eyeW, eyeH);
+                            // Ocular region band (x: 32 to 128, y: 30 to 65 in 160x120 frame)
+                            const imgData = offCtx.getImageData(32, 30, 96, 35);
                             const pixels = imgData.data;
+                            let sumLum = 0;
                             let darkPixels = 0;
                             const totalPixels = pixels.length / 4;
 
                             for (let i = 0; i < pixels.length; i += 4) {
                                 const lum = (pixels[i] * 0.299 + pixels[i+1] * 0.587 + pixels[i+2] * 0.114);
-                                if (lum < 55) {
+                                sumLum += lum;
+                                if (lum < 65) {
                                     darkPixels++;
                                 }
                             }
 
-                            // If dark pupil/iris pixels drop (eyelids closed covering pupil)
-                            if (darkPixels < (totalPixels * 0.04)) {
+                            const avgLum = sumLum / totalPixels;
+                            let varSum = 0;
+                            for (let i = 0; i < pixels.length; i += 4) {
+                                const lum = (pixels[i] * 0.299 + pixels[i+1] * 0.587 + pixels[i+2] * 0.114);
+                                varSum += (lum - avgLum) * (lum - avgLum);
+                            }
+                            const stdDev = Math.sqrt(varSum / totalPixels);
+
+                            // When eyes close, pupils/irises are covered by skin -> stdDev drops & dark pupil pixel count drops!
+                            const closedThisFrame = (stdDev < 18 || darkPixels < 20);
+
+                            if (closedThisFrame) {
                                 closedFrameCounter++;
                             } else {
                                 closedFrameCounter = Math.max(0, closedFrameCounter - 1);
                             }
 
-                            if (closedFrameCounter >= 3) {
+                            if (closedFrameCounter >= 2) {
                                 isEyeClosed = true;
                             }
                         } catch (e) {
-                            // Canvas cross-origin safeguard fallback
+                            console.warn("Eye analysis exception:", e);
                         }
 
                         const effectiveState = isEyeClosed ? 'Drowsy' : driverState;
