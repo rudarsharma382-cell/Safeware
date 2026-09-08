@@ -62,6 +62,9 @@
     <!-- React & ReactDOM CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- MediaPipe Camera Utils & FaceMesh CDN for 100% Real-Time Eye Aspect Ratio Tracking -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
     <!-- Framer Motion CDN -->
     <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
     <!-- Babel standalone JSX compiler -->
@@ -460,8 +463,33 @@
                 let animId = null;
                 let closedFrameCounter = 0;
                 let lastStateSent = 'Active';
+                let faceMesh = null;
+                let mpLandmarks = null;
 
-                const drawHUD = () => {
+                if (window.FaceMesh) {
+                    try {
+                        faceMesh = new window.FaceMesh({
+                            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+                        });
+                        faceMesh.setOptions({
+                            maxNumFaces: 1,
+                            refineLandmarks: true,
+                            minDetectionConfidence: 0.5,
+                            minTrackingConfidence: 0.5
+                        });
+                        faceMesh.onResults((results) => {
+                            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                                mpLandmarks = results.multiFaceLandmarks[0];
+                            } else {
+                                mpLandmarks = null;
+                            }
+                        });
+                    } catch (e) {
+                        console.warn("MediaPipe init error:", e);
+                    }
+                }
+
+                const drawHUD = async () => {
                     const video = videoRef.current;
                     const canvas = canvasRef.current;
                     if (video && canvas && video.readyState >= 2) {
@@ -475,57 +503,33 @@
                         const w = canvas.width;
                         const h = canvas.height;
 
-                        const fx = w * 0.25;
-                        const fy = h * 0.18;
-                        const fw = w * 0.50;
-                        const fh = h * 0.64;
+                        if (faceMesh && video.currentTime > 0) {
+                            try {
+                                await faceMesh.send({ image: video });
+                            } catch (e) {}
+                        }
 
-                        // Dynamic Multi-Band Scanning Eye Closure Detection Engine
                         let isEyeClosed = false;
-                        try {
-                            if (!window._eyeOffCanvas) {
-                                window._eyeOffCanvas = document.createElement('canvas');
-                                window._eyeOffCanvas.width = 160;
-                                window._eyeOffCanvas.height = 120;
-                            }
-                            const offCanvas = window._eyeOffCanvas;
-                            const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
-                            offCtx.drawImage(video, 0, 0, 160, 120);
+                        let calculatedEar = 0.32;
 
-                            let maxEyeContrast = 0;
-                            let maxDarkPixels = 0;
+                        if (mpLandmarks) {
+                            const dist = (a, b) => Math.hypot((a.x - b.x) * w, (a.y - b.y) * h);
+                            
+                            // Left Eye Landmarks: 33 (outer), 133 (inner), 160 (top), 144 (bottom), 158 (top2), 153 (bottom2)
+                            const leftVer1 = dist(mpLandmarks[160], mpLandmarks[144]);
+                            const leftVer2 = dist(mpLandmarks[158], mpLandmarks[153]);
+                            const leftHor = dist(mpLandmarks[33], mpLandmarks[133]);
+                            const leftEAR = (leftVer1 + leftVer2) / (2.0 * Math.max(1, leftHor));
 
-                            // Scan 4 vertical eye bands down the face region (y: 20px to 68px in 160x120 frame)
-                            for (let bandY = 20; bandY <= 68; bandY += 12) {
-                                const imgData = offCtx.getImageData(32, bandY, 96, 20);
-                                const pixels = imgData.data;
-                                let sumLum = 0;
-                                let darks = 0;
-                                const totalPix = pixels.length / 4;
+                            // Right Eye Landmarks: 362 (outer), 263 (inner), 385 (top), 373 (bottom), 387 (top2), 380 (bottom2)
+                            const rightVer1 = dist(mpLandmarks[385], mpLandmarks[373]);
+                            const rightVer2 = dist(mpLandmarks[387], mpLandmarks[380]);
+                            const rightHor = dist(mpLandmarks[362], mpLandmarks[263]);
+                            const rightEAR = (rightVer1 + rightVer2) / (2.0 * Math.max(1, rightHor));
 
-                                for (let i = 0; i < pixels.length; i += 4) {
-                                    const lum = (pixels[i] * 0.299 + pixels[i+1] * 0.587 + pixels[i+2] * 0.114);
-                                    sumLum += lum;
-                                    if (lum < 60) darks++;
-                                }
+                            calculatedEar = (leftEAR + rightEAR) / 2.0;
 
-                                const avgL = sumLum / totalPix;
-                                let vSum = 0;
-                                for (let i = 0; i < pixels.length; i += 4) {
-                                    const lum = (pixels[i] * 0.299 + pixels[i+1] * 0.587 + pixels[i+2] * 0.114);
-                                    vSum += (lum - avgL) * (lum - avgL);
-                                }
-                                const bandStdDev = Math.sqrt(vSum / totalPix);
-
-                                if (bandStdDev > maxEyeContrast) maxEyeContrast = bandStdDev;
-                                if (darks > maxDarkPixels) maxDarkPixels = darks;
-                            }
-
-                            // When eyes are OPEN: pupils/irises create high contrast (maxEyeContrast >= 20 & maxDarkPixels >= 22)
-                            // When eyes CLOSE: eyelids cover pupils -> maxEyeContrast < 18 or maxDarkPixels < 20!
-                            const closedThisFrame = (maxEyeContrast < 20 || maxDarkPixels < 20);
-
-                            if (closedThisFrame) {
+                            if (calculatedEar < 0.18) {
                                 closedFrameCounter++;
                             } else {
                                 closedFrameCounter = Math.max(0, closedFrameCounter - 1);
@@ -534,8 +538,56 @@
                             if (closedFrameCounter >= 2) {
                                 isEyeClosed = true;
                             }
-                        } catch (e) {
-                            console.warn("Eye analysis exception:", e);
+                        } else {
+                            try {
+                                if (!window._eyeOffCanvas) {
+                                    window._eyeOffCanvas = document.createElement('canvas');
+                                    window._eyeOffCanvas.width = 160;
+                                    window._eyeOffCanvas.height = 120;
+                                }
+                                const offCanvas = window._eyeOffCanvas;
+                                const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+                                offCtx.drawImage(video, 0, 0, 160, 120);
+
+                                let maxEyeContrast = 0;
+                                let maxDarkPixels = 0;
+
+                                for (let bandY = 20; bandY <= 75; bandY += 10) {
+                                    const imgData = offCtx.getImageData(25, bandY, 110, 18);
+                                    const pixels = imgData.data;
+                                    let sumLum = 0;
+                                    let darks = 0;
+                                    const totalPix = pixels.length / 4;
+
+                                    for (let i = 0; i < pixels.length; i += 4) {
+                                        const lum = (pixels[i] * 0.299 + pixels[i+1] * 0.587 + pixels[i+2] * 0.114);
+                                        sumLum += lum;
+                                        if (lum < 65) darks++;
+                                    }
+
+                                    const avgL = sumLum / totalPix;
+                                    let vSum = 0;
+                                    for (let i = 0; i < pixels.length; i += 4) {
+                                        const lum = (pixels[i] * 0.299 + pixels[i+1] * 0.587 + pixels[i+2] * 0.114);
+                                        vSum += (lum - avgL) * (lum - avgL);
+                                    }
+                                    const bandStdDev = Math.sqrt(vSum / totalPix);
+
+                                    if (bandStdDev > maxEyeContrast) maxEyeContrast = bandStdDev;
+                                    if (darks > maxDarkPixels) maxDarkPixels = darks;
+                                }
+
+                                if (maxEyeContrast < 20 || maxDarkPixels < 20) {
+                                    closedFrameCounter++;
+                                } else {
+                                    closedFrameCounter = Math.max(0, closedFrameCounter - 1);
+                                }
+
+                                if (closedFrameCounter >= 2) {
+                                    isEyeClosed = true;
+                                    calculatedEar = 0.05;
+                                }
+                            } catch (e) {}
                         }
 
                         const effectiveState = isEyeClosed ? 'Drowsy' : driverState;
@@ -557,7 +609,7 @@
                             }).catch(() => {});
                         }
 
-                        const hudColor = effectiveState === 'Active' ? '#00FFCC' : (effectiveState === 'Drowsy' ? '#ef4444' : '#ef4444');
+                        const hudColor = effectiveState === 'Active' ? '#00FFCC' : '#ef4444';
 
                         // Outer Flashing Danger Border when Eye Closed
                         if (effectiveState === 'Drowsy' || isEyeClosed) {
@@ -567,57 +619,50 @@
 
                             ctx.fillStyle = '#ef4444';
                             ctx.font = 'bold 16px monospace';
-                            ctx.fillText('⚠️ DANGER: EYE CLOSURE DETECTED (EAR < 0.15)', 20, 35);
+                            ctx.fillText(`⚠️ DANGER: EYE CLOSURE DETECTED (EAR: ${calculatedEar.toFixed(2)} < 0.18)`, 20, 35);
                         }
 
-                        // Face Bounding Box Corners
-                        ctx.strokeStyle = hudColor;
-                        ctx.lineWidth = 3;
-                        const l = 25;
-                        ctx.beginPath(); ctx.moveTo(fx, fy + l); ctx.lineTo(fx, fy); ctx.lineTo(fx + l, fy); ctx.stroke();
-                        ctx.beginPath(); ctx.moveTo(fx + fw - l, fy); ctx.lineTo(fx + fw); ctx.lineTo(fx + fw, fy + l); ctx.stroke();
-                        ctx.beginPath(); ctx.moveTo(fx, fy + fh - l); ctx.lineTo(fx, fy + fh); ctx.lineTo(fx + l, fy + fh); ctx.stroke();
-                        ctx.beginPath(); ctx.moveTo(fx + fw - l, fy + fh); ctx.lineTo(fx + fw); ctx.lineTo(fx + fw, fy + fh - l); ctx.stroke();
-
-                        // Eye Landmark Target Circles
-                        const leftEye = { x: fx + fw * 0.33, y: fy + fh * 0.35 };
-                        const rightEye = { x: fx + fw * 0.67, y: fy + fh * 0.35 };
-
-                        ctx.strokeStyle = hudColor;
-                        ctx.lineWidth = 2;
-                        if (!isEyeClosed) {
-                            ctx.beginPath(); ctx.arc(leftEye.x, leftEye.y, 16, 0, Math.PI * 2); ctx.stroke();
-                            ctx.beginPath(); ctx.arc(rightEye.x, rightEye.y, 16, 0, Math.PI * 2); ctx.stroke();
+                        if (mpLandmarks) {
+                            mpLandmarks.forEach((pt, idx) => {
+                                if ([33, 133, 160, 144, 158, 153, 362, 263, 385, 373, 387, 380, 1, 61, 291].includes(idx)) {
+                                    ctx.fillStyle = hudColor;
+                                    ctx.beginPath();
+                                    ctx.arc(pt.x * w, pt.y * h, 3, 0, Math.PI * 2);
+                                    ctx.fill();
+                                }
+                            });
                         } else {
-                            // Closed eye horizontal warning line
-                            ctx.beginPath(); ctx.moveTo(leftEye.x - 18, leftEye.y); ctx.lineTo(leftEye.x + 18, leftEye.y); ctx.stroke();
-                            ctx.beginPath(); ctx.moveTo(rightEye.x - 18, rightEye.y); ctx.lineTo(rightEye.x + 18, rightEye.y); ctx.stroke();
+                            const fx = w * 0.25;
+                            const fy = h * 0.18;
+                            const fw = w * 0.50;
+                            const fh = h * 0.64;
+
+                            ctx.strokeStyle = hudColor;
+                            ctx.lineWidth = 3;
+                            const l = 25;
+                            ctx.beginPath(); ctx.moveTo(fx, fy + l); ctx.lineTo(fx, fy); ctx.lineTo(fx + l, fy); ctx.stroke();
+                            ctx.beginPath(); ctx.moveTo(fx + fw - l, fy); ctx.lineTo(fx + fw); ctx.lineTo(fx + fw, fy + l); ctx.stroke();
+                            ctx.beginPath(); ctx.moveTo(fx, fy + fh - l); ctx.lineTo(fx, fy + fh); ctx.lineTo(fx + l, fy + fh); ctx.stroke();
+                            ctx.beginPath(); ctx.moveTo(fx + fw - l, fy + fh); ctx.lineTo(fx + fw); ctx.lineTo(fx + fw, fy + fh - l); ctx.stroke();
+
+                            const leftEye = { x: fx + fw * 0.33, y: fy + fh * 0.35 };
+                            const rightEye = { x: fx + fw * 0.67, y: fy + fh * 0.35 };
+
+                            ctx.strokeStyle = hudColor;
+                            ctx.lineWidth = 2;
+                            if (!isEyeClosed) {
+                                ctx.beginPath(); ctx.arc(leftEye.x, leftEye.y, 16, 0, Math.PI * 2); ctx.stroke();
+                                ctx.beginPath(); ctx.arc(rightEye.x, rightEye.y, 16, 0, Math.PI * 2); ctx.stroke();
+                            } else {
+                                ctx.beginPath(); ctx.moveTo(leftEye.x - 18, leftEye.y); ctx.lineTo(leftEye.x + 18, leftEye.y); ctx.stroke();
+                                ctx.beginPath(); ctx.moveTo(rightEye.x - 18, rightEye.y); ctx.lineTo(rightEye.x + 18, rightEye.y); ctx.stroke();
+                            }
                         }
 
-                        ctx.lineWidth = 1;
-                        ctx.beginPath(); ctx.moveTo(leftEye.x - 20, leftEye.y); ctx.lineTo(leftEye.x + 20, leftEye.y); ctx.stroke();
-                        ctx.beginPath(); ctx.moveTo(leftEye.x, leftEye.y - 20); ctx.lineTo(leftEye.x, leftEye.y + 20); ctx.stroke();
-                        ctx.beginPath(); ctx.moveTo(rightEye.x - 20, rightEye.y); ctx.lineTo(rightEye.x + 20, rightEye.y); ctx.stroke();
-                        ctx.beginPath(); ctx.moveTo(rightEye.x, rightEye.y - 20); ctx.lineTo(rightEye.x, rightEye.y + 20); ctx.stroke();
-
-                        // Key facial mesh points
-                        const pts = [
-                            { x: fx + fw * 0.5, y: fy + fh * 0.2 },
-                            { x: fx + fw * 0.5, y: fy + fh * 0.5 },
-                            { x: fx + fw * 0.38, y: fy + fh * 0.5 },
-                            { x: fx + fw * 0.62, y: fy + fh * 0.5 },
-                            { x: fx + fw * 0.5, y: fy + fh * 0.75 }
-                        ];
-                        ctx.fillStyle = hudColor;
-                        pts.forEach(pt => {
-                            ctx.beginPath(); ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2); ctx.fill();
-                        });
-
-                        // Status text banner
                         ctx.fillStyle = hudColor;
                         ctx.font = 'bold 12px monospace';
-                        const earText = effectiveState === 'Active' ? 'EAR: 0.32 [NOMINAL]' : 'EAR: 0.05 [DANGER: EYE CLOSURE]';
-                        ctx.fillText(earText, fx + 10, fy - 10);
+                        const earText = effectiveState === 'Active' ? `EAR: ${calculatedEar.toFixed(2)} [NOMINAL]` : `EAR: ${calculatedEar.toFixed(2)} [DANGER: EYE CLOSURE]`;
+                        ctx.fillText(earText, 20, h - 20);
                     }
                     animId = requestAnimationFrame(drawHUD);
                 };
